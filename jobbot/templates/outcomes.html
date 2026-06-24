@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Outcomes — JobBot{% endblock %}
+{% block content %}
+<h1>Application Outcomes</h1>
+<p>Set an application to <strong>Callback</strong> to promote its answers to reference material for future generation.</p>
+
+{% if applications %}
+<table class="outcomes-table">
+  <thead>
+    <tr>
+      <th>Company</th>
+      <th>Role</th>
+      <th>Status</th>
+      <th>Submitted</th>
+      <th>Update Status</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for a in applications %}
+  <tr class="status-{{ a.status }}">
+    <td>{{ a.company_name }}</td>
+    <td>
+      <a href="{{ url_for('review', app_id=a.id) }}">{{ a.job_title }}</a>
+    </td>
+    <td><span class="badge badge-{{ a.status }}">{{ a.status }}</span></td>
+    <td>{{ a.submitted_at[:10] if a.submitted_at else a.created_at[:10] }}</td>
+    <td>
+      <form method="POST" action="{{ url_for('outcomes_update_status') }}" style="display:inline">
+        <input type="hidden" name="app_id" value="{{ a.id }}">
+        <select name="status">
+          <option value="submitted" {% if a.status=='submitted' %}selected{% endif %}>Submitted</option>
+          <option value="callback" {% if a.status=='callback' %}selected{% endif %}>Callback ★</option>
+          <option value="rejected" {% if a.status=='rejected' %}selected{% endif %}>Rejected</option>
+          <option value="ghosted" {% if a.status=='ghosted' %}selected{% endif %}>Ghosted</option>
+        </select>
+        <button type="submit">Update</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No applications yet. <a href="{{ url_for('intake') }}">Start one →</a></p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,26 @@
+{
+  "work_authorization": "US Citizen",
+  "sponsorship_needed": false,
+  "salary_expectation": "competitive / market rate",
+  "preferred_salary_range": "$120,000 – $160,000",
+  "location": "San Francisco Bay Area, CA",
+  "open_to_remote": true,
+  "open_to_hybrid": true,
+  "open_to_relocation": false,
+  "notice_period": "2 weeks",
+  "start_availability": "immediate",
+  "linkedin": "https://linkedin.com/in/yourprofile",
+  "github": "https://github.com/yourhandle",
+  "portfolio": "",
+  "eeo": {
+    "gender": "Prefer not to say",
+    "race_ethnicity": "Prefer not to say",
+    "veteran_status": "I am not a protected veteran",
+    "disability_status": "I do not have a disability"
+  },
+  "additional": {
+    "years_of_experience": 3,
+    "highest_degree": "Bachelor's",
+    "willing_to_complete_background_check": true
+  }
+}

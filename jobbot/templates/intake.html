@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Intake — JobBot{% endblock %}
+{% block content %}
+<h1>New Application</h1>
+{% if error %}<div class="msg err">{{ error }}</div>{% endif %}
+
+<form method="POST" action="{{ url_for('intake_submit') }}">
+  <div class="form-group">
+    <label>Company Name *</label>
+    <input name="company_name" required placeholder="Acme Corp" autocomplete="off">
+  </div>
+  <div class="form-group">
+    <label>Job Title *</label>
+    <input name="job_title" required placeholder="Software Engineer, Backend">
+  </div>
+  <div class="form-group">
+    <label>Job URL</label>
+    <input name="job_url" type="url" placeholder="https://jobs.example.com/...">
+  </div>
+  <div class="form-group">
+    <label>ATS Platform</label>
+    <select name="ats_platform">
+      <option value="">Unknown / Other</option>
+      <option value="greenhouse">Greenhouse</option>
+      <option value="lever">Lever</option>
+      <option value="ashby">Ashby</option>
+      <option value="workday">Workday</option>
+      <option value="icims">iCIMS</option>
+      <option value="smartrecruiters">SmartRecruiters</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>Job Description (paste full text)</label>
+    <textarea name="jd_text" rows="14" placeholder="Paste the full JD here…"></textarea>
+  </div>
+  <button type="submit" class="btn-primary">Start Review →</button>
+</form>
+
+<hr>
+<section class="selenium-panel">
+  <h2>Browser Controls</h2>
+  <div class="row-inline">
+    <input id="nav-url" type="url" placeholder="Navigate Selenium browser to URL…" style="flex:1">
+    <button onclick="navigateTo()">Go</button>
+  </div>
+  <p id="nav-msg" class="msg"></p>
+  <button onclick="getUrl()">Show Current URL</button>
+  <p id="cur-url" class="msg"></p>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+async function navigateTo() {
+  const url = document.getElementById('nav-url').value;
+  const r = await post('/api/browser/navigate', {url});
+  show(document.getElementById('nav-msg'), r.error || 'Navigated', !!r.error);
+}
+async function getUrl() {
+  const r = await fetch('/api/browser/current_url').then(x=>x.json());
+  const el = document.getElementById('cur-url');
+  el.textContent = r.url || r.error;
+  el.className = 'msg ok';
+}
+</script>
+{% endblock %}

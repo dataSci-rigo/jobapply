@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Discover Jobs — JobBot{% endblock %}
+{% block content %}
+<h1>Job Discovery</h1>
+<p>JobBot scrapes LinkedIn, Indeed, and Glassdoor daily at {{ scrape_hour }}:00. Leads are scored 0–100 against your preferences.</p>
+
+<div class="toolbar">
+  <button id="btn-run" class="btn-primary" onclick="runScrape()">Run scrape now</button>
+  <span id="scrape-msg" class="msg"></span>
+  <span style="flex:1"></span>
+  <div class="filter-tabs">
+    <a href="?status=" class="tab {% if not active_status %}active{% endif %}">All</a>
+    <a href="?status=pending" class="tab {% if active_status=='pending' %}active{% endif %}">Pending</a>
+    <a href="?status=kept" class="tab {% if active_status=='kept' %}active{% endif %}">Kept</a>
+    <a href="?status=imported" class="tab {% if active_status=='imported' %}active{% endif %}">Imported</a>
+    <a href="?status=discarded" class="tab {% if active_status=='discarded' %}active{% endif %}">Discarded</a>
+  </div>
+</div>
+
+{% if leads %}
+<div class="lead-grid">
+  {% for lead in leads %}
+  <div class="card lead-card" id="lead-{{ lead.id }}">
+    <div class="lead-header">
+      <span class="lead-title">{{ lead.title or '(no title)' }}</span>
+      {% if lead.ai_score is not none %}
+        <span class="score-badge score-{{ 'high' if lead.ai_score >= 70 else ('mid' if lead.ai_score >= 40 else 'low') }}">
+          {{ lead.ai_score }}
+        </span>
+      {% else %}
+        <span class="score-badge score-none">—</span>
+      {% endif %}
+    </div>
+    <div class="lead-meta">
+      <strong>{{ lead.company_name or '—' }}</strong>
+      {% if lead.location %} · {{ lead.location }}{% endif %}
+    </div>
+    {% if lead.jd_snippet %}
+    <p class="lead-snippet">{{ lead.jd_snippet[:200] }}{% if lead.jd_snippet|length > 200 %}…{% endif %}</p>
+    {% endif %}
+    <div class="lead-actions">
+      {% if lead.job_url %}
+      <a href="{{ lead.job_url }}" target="_blank" class="btn-sm">Open ↗</a>
+      {% endif %}
+      {% if lead.status == 'pending' %}
+      <button class="btn-sm btn-primary" onclick="importLead({{ lead.id }})">Import → Intake</button>
+      <button class="btn-sm btn-danger" onclick="discardLead({{ lead.id }})">Discard</button>
+      {% elif lead.status == 'imported' %}
+      <span class="badge badge-callback">Imported</span>
+      {% elif lead.status == 'discarded' %}
+      <span class="badge badge-rejected">Discarded</span>
+      {% elif lead.status == 'kept' %}
+      <button class="btn-sm btn-primary" onclick="importLead({{ lead.id }})">Import → Intake</button>
+      {% endif %}
+    </div>
+    <div class="lead-date">{{ lead.created_at[:10] }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p>No leads yet. Click <strong>Run scrape now</strong> or wait for the daily 8am run.</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function runScrape() {
+  const btn = document.getElementById('btn-run');
+  const msg = document.getElementById('scrape-msg');
+  btn.disabled = true;
+  show(msg, 'Scraping… this may take a minute.', false);
+  const data = await post('/api/discover/run', {});
+  btn.disabled = false;
+  if (data.error) { show(msg, data.error, true); }
+  else { show(msg, `Done — ${data.new_leads} new leads, ${data.scored} scored.`, false); setTimeout(() => location.reload(), 1500); }
+}
+
+async function importLead(id) {
+  const data = await post('/api/discover/import/' + id, {});
+  if (data.error) { alert(data.error); return; }
+  window.location.href = data.redirect;
+}
+
+async function discardLead(id) {
+  const card = document.getElementById('lead-' + id);
+  const data = await post('/api/discover/discard/' + id, {});
+  if (data.error) { alert(data.error); return; }
+  if (card) card.style.opacity = '0.35';
+}
+</script>
+{% endblock %}

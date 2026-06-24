@@ -1,0 +1,36 @@
+# ── Personal data (never commit) ──────────────────────────────────────────────
+jobbot/data/master_resume.json
+jobbot/data/preferences.json
+jobbot/data/star.json
+jobbot/data/jobbot.db
+jobbot/data/pdfs/
+jobbot/data/gmail_credentials.json
+jobbot/data/gmail_token.json
+jobbot/data/gmail_oauth_state.json
+
+# ── Secrets / env ─────────────────────────────────────────────────────────────
+.env
+*.env
+.env.*
+
+# ── Python artifacts ──────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# ── Virtual envs ──────────────────────────────────────────────────────────────
+.venv/
+venv/
+
+# ── OS / editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+*.log
+*.tmp

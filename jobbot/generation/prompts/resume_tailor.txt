@@ -1,0 +1,12 @@
+Produce a tailored resume JSON for the job description below.
+
+Rules:
+1. SELECT bullets and skills from the master resume that are most relevant to this JD.
+2. You may REORDER and lightly REPHRASE bullets to better match the JD's language — do NOT fabricate any experience.
+3. Keep the JSON structure identical to the master resume (same keys). Only the content of bullets/skills/summary may change.
+4. Aim for the top 3-5 bullets per role (fewer is fine if fewer are relevant). Remove roles that add no signal for this JD.
+5. In the summary field, write 2-3 sentences that position the candidate for this specific role.
+6. Output ONLY valid JSON — no markdown fences, no commentary.
+
+JOB DESCRIPTION:
+{jd_text}

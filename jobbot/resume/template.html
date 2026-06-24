@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: letter; margin: 0.65in 0.7in; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Georgia", serif; font-size: 10.5pt; color: #1a1a1a; line-height: 1.35; }
+
+  /* Header */
+  .header { text-align: center; margin-bottom: 10pt; }
+  .header h1 { font-size: 18pt; font-weight: bold; letter-spacing: 0.04em; text-transform: uppercase; }
+  .contact { font-size: 9pt; color: #444; margin-top: 4pt; }
+  .contact a { color: #1a1a1a; text-decoration: none; }
+  .contact span { margin: 0 6pt; color: #999; }
+
+  /* Section headings */
+  h2 {
+    font-size: 10.5pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-bottom: 1pt solid #1a1a1a;
+    padding-bottom: 1pt;
+    margin-top: 10pt;
+    margin-bottom: 5pt;
+  }
+
+  /* Summary */
+  .summary { margin-bottom: 6pt; }
+
+  /* Experience */
+  .role-header { display: flex; justify-content: space-between; align-items: baseline; }
+  .role-company { font-weight: bold; }
+  .role-title { font-style: italic; }
+  .role-dates { font-size: 9.5pt; color: #444; white-space: nowrap; }
+  .role-loc { font-size: 9.5pt; color: #666; }
+  ul.bullets { margin-top: 3pt; margin-left: 14pt; }
+  ul.bullets li { margin-bottom: 2pt; }
+  .role-block { margin-bottom: 7pt; }
+
+  /* Education */
+  .edu-header { display: flex; justify-content: space-between; }
+  .edu-inst { font-weight: bold; }
+  .edu-deg { font-style: italic; }
+  .edu-date { font-size: 9.5pt; color: #444; }
+  .edu-block { margin-bottom: 5pt; }
+
+  /* Skills */
+  .skills-row { margin-bottom: 3pt; }
+  .skills-label { font-weight: bold; }
+
+  /* Projects */
+  .project-block { margin-bottom: 5pt; }
+  .project-name { font-weight: bold; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <h1>{{ r.name }}</h1>
+  <div class="contact">
+    {{ r.email }}
+    {% if r.phone %}<span>|</span>{{ r.phone }}{% endif %}
+    {% if r.location %}<span>|</span>{{ r.location }}{% endif %}
+    {% if r.linkedin %}<span>|</span><a href="{{ r.linkedin }}">LinkedIn</a>{% endif %}
+    {% if r.github %}<span>|</span><a href="{{ r.github }}">GitHub</a>{% endif %}
+    {% if r.portfolio %}<span>|</span><a href="{{ r.portfolio }}">Portfolio</a>{% endif %}
+  </div>
+</div>
+
+<!-- SUMMARY -->
+{% if r.summary %}
+<h2>Summary</h2>
+<p class="summary">{{ r.summary }}</p>
+{% endif %}
+
+<!-- EXPERIENCE -->
+{% if r.experience %}
+<h2>Experience</h2>
+{% for job in r.experience %}
+<div class="role-block">
+  <div class="role-header">
+    <div>
+      <span class="role-company">{{ job.company }}</span>
+      {% if job.title %} &mdash; <span class="role-title">{{ job.title }}</span>{% endif %}
+      {% if job.location %} <span class="role-loc">({{ job.location }})</span>{% endif %}
+    </div>
+    <div class="role-dates">{{ job.start }} &ndash; {{ job.end }}</div>
+  </div>
+  {% if job.bullets %}
+  <ul class="bullets">
+    {% for bullet in job.bullets %}
+    <li>{{ bullet }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- PROJECTS -->
+{% if r.projects %}
+<h2>Projects</h2>
+{% for proj in r.projects %}
+<div class="project-block">
+  <span class="project-name">{{ proj.name }}</span>
+  {% if proj.description %} &mdash; {{ proj.description }}{% endif %}
+  {% if proj.bullets %}
+  <ul class="bullets">
+    {% for b in proj.bullets %}<li>{{ b }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- SKILLS -->
+{% if r.skills %}
+<h2>Skills</h2>
+{% if r.skills.languages %}
+<div class="skills-row"><span class="skills-label">Languages:</span> {{ r.skills.languages | join(", ") }}</div>
+{% endif %}
+{% if r.skills.frameworks %}
+<div class="skills-row"><span class="skills-label">Frameworks:</span> {{ r.skills.frameworks | join(", ") }}</div>
+{% endif %}
+{% if r.skills.tools %}
+<div class="skills-row"><span class="skills-label">Tools:</span> {{ r.skills.tools | join(", ") }}</div>
+{% endif %}
+{% if r.skills.other %}
+<div class="skills-row">{{ r.skills.other | join(", ") }}</div>
+{% endif %}
+{% endif %}
+
+<!-- EDUCATION -->
+{% if r.education %}
+<h2>Education</h2>
+{% for edu in r.education %}
+<div class="edu-block">
+  <div class="edu-header">
+    <div>
+      <span class="edu-inst">{{ edu.institution }}</span>
+      {% if edu.degree %} &mdash; <span class="edu-deg">{{ edu.degree }}</span>{% endif %}
+      {% if edu.gpa %} (GPA: {{ edu.gpa }}){% endif %}
+    </div>
+    <div class="edu-date">{{ edu.graduated }}</div>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- CERTIFICATIONS -->
+{% if r.certifications %}
+<h2>Certifications</h2>
+<ul class="bullets">
+{% for cert in r.certifications %}<li>{{ cert }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+</body>
+</html>

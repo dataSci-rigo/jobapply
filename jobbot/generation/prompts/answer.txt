@@ -1,0 +1,18 @@
+Answer the following application question using ONLY the candidate's real background.
+
+QUESTION: {question}
+FIELD TYPE: {field_type}
+CHARACTER LIMIT: {char_limit}
+JOB DESCRIPTION CONTEXT:
+{jd_snippet}
+
+{reference_block}
+
+Instructions:
+- Answer directly and concisely. Do not pad to hit the character limit.
+- Stay strictly within {char_limit} characters.
+- Use first person ("I").
+- If this is a yes/no or select field, output only the exact option value.
+- Do not mention the job description explicitly unless it is natural to do so.
+- Draw from the STAR stories and work history for behavioral questions.
+- Output only the answer text — no preamble, no explanation.

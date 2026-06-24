@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Gmail — JobBot{% endblock %}
+{% block content %}
+<h1>Gmail Outcome Detection</h1>
+<p>Connect your Gmail so JobBot can detect recruiter replies and update your application statuses automatically.</p>
+
+<div class="card" style="max-width:480px;margin-bottom:1.5rem">
+  {% if connected %}
+  <p class="msg ok">Connected to Gmail ✓</p>
+  <p>Last sync: {{ last_sync or 'never' }}</p>
+  <button class="btn-primary" id="btn-sync" onclick="syncGmail()">Sync now</button>
+  <span id="sync-msg" class="msg"></span>
+  <hr>
+  <a href="{{ url_for('gmail_auth') }}" class="btn-sm">Re-authorise</a>
+  {% else %}
+  <p>Not connected.</p>
+  {% if not creds_file_exists %}
+  <p class="msg err">Place your <code>gmail_credentials.json</code> (Google OAuth client secret) in <code>data/</code> before connecting.</p>
+  {% else %}
+  <a href="{{ url_for('gmail_auth') }}" class="btn-primary">Connect Gmail →</a>
+  {% endif %}
+  {% endif %}
+</div>
+
+{% if syncs %}
+<h2>Recent detections</h2>
+<table class="outcomes-table">
+  <thead>
+    <tr>
+      <th>Application</th>
+      <th>From</th>
+      <th>Subject</th>
+      <th>Detected</th>
+      <th>Synced</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for s in syncs %}
+  <tr>
+    <td><a href="{{ url_for('review', app_id=s.application_id) }}">{{ s.company_name }} — {{ s.job_title }}</a></td>
+    <td>{{ s.sender }}</td>
+    <td>{{ s.subject }}</td>
+    <td><span class="badge badge-{{ s.detected_status }}">{{ s.detected_status }}</span></td>
+    <td>{{ s.synced_at[:10] }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% elif connected %}
+<p>No detections yet — click <strong>Sync now</strong> to scan the last {{ sync_days }} days.</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function syncGmail() {
+  const btn = document.getElementById('btn-sync');
+  const msg = document.getElementById('sync-msg');
+  btn.disabled = true;
+  show(msg, 'Syncing Gmail…', false);
+  const data = await post('/api/gmail/sync', {});
+  btn.disabled = false;
+  if (data.error) { show(msg, data.error, true); }
+  else { show(msg, `Done — ${data.updated} applications updated.`, false); setTimeout(() => location.reload(), 1500); }
+}
+</script>
+{% endblock %}

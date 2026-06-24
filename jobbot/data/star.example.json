@@ -1,0 +1,20 @@
+[
+  {
+    "id": "star_01",
+    "title": "Improved API performance",
+    "skills_demonstrated": ["performance optimization", "backend engineering"],
+    "situation": "Our public API had p99 latency of 800ms, causing timeouts for mobile clients.",
+    "task": "I was asked to reduce latency to under 200ms without a major rewrite.",
+    "action": "Profiled the hot path, added Redis caching for expensive DB queries, and restructured the serializer to avoid N+1 calls.",
+    "result": "p99 latency dropped to 140ms. Monthly infra costs fell 18% due to fewer DB reads."
+  },
+  {
+    "id": "star_02",
+    "title": "Led cross-functional feature launch",
+    "skills_demonstrated": ["leadership", "cross-functional collaboration", "project management"],
+    "situation": "A key customer-facing feature was blocked across three teams for two quarters.",
+    "task": "I volunteered to own coordination and delivery.",
+    "action": "Set up weekly syncs, wrote the shared API contract, and unblocked design and data teams by writing interim mocks.",
+    "result": "Feature shipped on time; NPS for that segment rose 12 points in the next survey."
+  }
+]

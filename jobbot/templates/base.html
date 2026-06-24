@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}JobBot{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <nav>
+    <a href="{{ url_for('intake') }}" class="nav-brand">JobBot</a>
+    <div class="nav-links">
+      <a href="{{ url_for('discover') }}">Discover</a>
+      <a href="{{ url_for('intake') }}">New Application</a>
+      <a href="{{ url_for('outcomes') }}">Outcomes</a>
+      <a href="{{ url_for('gmail_setup') }}">Gmail</a>
+      <a href="{{ url_for('credentials_page') }}">Logins</a>
+    </div>
+  </nav>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <script>
+    // Global helper: JSON POST
+    async function post(url, body) {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+      });
+      return r.json();
+    }
+    function show(el, msg, isErr) {
+      el.textContent = msg;
+      el.className = isErr ? 'msg err' : 'msg ok';
+    }
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% block title %}Review — {{ app.job_title }} @ {{ app.company_name }}{% endblock %}
+{% block content %}
+<h1>{{ app.job_title }} <span class="at">@</span> {{ app.company_name }}</h1>
+{% if prior_count > 0 %}
+<div class="msg ok">You have applied to {{ app.company_name }} {{ prior_count }} time(s) before.</div>
+{% endif %}
+{% if app.job_url %}
+<p><a href="{{ app.job_url }}" target="_blank">View Job Posting ↗</a></p>
+{% endif %}
+
+<!-- ── Resume ────────────────────────────────────────────────────────────── -->
+<section class="card">
+  <h2>Tailored Resume</h2>
+  {% if resume_version and resume_version.pdf_path %}
+    <p class="ok msg">PDF ready: <code>{{ resume_version.pdf_path }}</code></p>
+    <button onclick="regenResume()">Regenerate Resume</button>
+  {% else %}
+    <button onclick="regenResume()" class="btn-primary">Generate Tailored Resume</button>
+  {% endif %}
+  <p id="resume-msg" class="msg"></p>
+  <div id="resume-preview" class="json-preview">
+    {% if resume_version and resume_version.resume_json %}
+      <pre>{{ resume_version.resume_json | tojson(indent=2) }}</pre>
+    {% endif %}
+  </div>
+</section>
+
+<!-- ── Cover Letter ──────────────────────────────────────────────────────── -->
+<section class="card">
+  <h2>Cover Letter</h2>
+  <button onclick="regenCoverLetter()" class="btn-primary"
+    id="cl-gen-btn">{% if cover_letter %}Regenerate{% else %}Generate{% endif %} Cover Letter</button>
+  <p id="cl-msg" class="msg"></p>
+  <textarea id="cl-text" rows="14" style="width:100%;margin-top:8px">{{ cover_letter.text if cover_letter else '' }}</textarea>
+  <button onclick="saveCoverLetter()" id="cl-save-btn" {% if not cover_letter %}style="display:none"{% endif %}>
+    Save Edits
+  </button>
+  <input type="hidden" id="cl-id" value="{{ cover_letter.id if cover_letter else '' }}">
+</section>
+
+<!-- ── Form Field Scanner ────────────────────────────────────────────────── -->
+<section class="card">
+  <h2>Form Fields (from Live Browser)</h2>
+  <button onclick="scanPage()" class="btn-primary">Scan Current Page</button>
+  <p id="scan-msg" class="msg"></p>
+  <div id="fields-container"></div>
+  <button id="push-btn" onclick="pushToForm()" style="display:none" class="btn-primary">
+    Push Accepted Answers to Form
+  </button>
+  <p id="push-msg" class="msg"></p>
+</section>
+
+<!-- ── Saved Answers ─────────────────────────────────────────────────────── -->
+<section class="card">
+  <h2>Saved Answers ({{ answers | length }})</h2>
+  {% if answers %}
+  <table class="answers-table">
+    <thead><tr><th>Question</th><th>Answer</th><th>Source</th></tr></thead>
+    <tbody>
+    {% for ans in answers %}
+    <tr>
+      <td>{{ ans.question_text }}</td>
+      <td>{{ ans.answer_text[:200] }}{% if ans.answer_text|length > 200 %}…{% endif %}</td>
+      <td>{{ ans.source }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No answers saved yet. Scan the page to generate answers for form fields.</p>
+  {% endif %}
+</section>
+
+<!-- ── Mark Submitted ────────────────────────────────────────────────────── -->
+<section class="card">
+  <h2>After You Click Submit</h2>
+  <p>Fill the form in the browser window, click Submit on the real site, then mark this application as submitted here.</p>
+  <form method="POST" action="{{ url_for('mark_submitted', app_id=app.id) }}" style="display:inline">
+    <button type="submit" class="btn-warn">Mark as Submitted</button>
+  </form>
+</section>
+
+<script>
+const APP_ID = {{ app.id }};
+let scannedFields = [];
+let clId = document.getElementById('cl-id').value;
+
+// ── Resume ────────────────────────────────────────────────────────────────────
+async function regenResume() {
+  const msg = document.getElementById('resume-msg');
+  msg.textContent = 'Generating… (this may take 10-20s)';
+  msg.className = 'msg';
+  const r = await post('/api/generate/resume', {app_id: APP_ID});
+  if (r.error) { show(msg, r.error, true); return; }
+  show(msg, 'Resume generated. PDF: ' + r.pdf_path, false);
+  const pre = document.querySelector('#resume-preview pre') || (() => {
+    const p = document.createElement('pre');
+    document.getElementById('resume-preview').appendChild(p);
+    return p;
+  })();
+  pre.textContent = JSON.stringify(r.resume_json, null, 2);
+}
+
+// ── Cover Letter ──────────────────────────────────────────────────────────────
+async function regenCoverLetter() {
+  const msg = document.getElementById('cl-msg');
+  msg.textContent = 'Generating…';
+  msg.className = 'msg';
+  const r = await post('/api/generate/cover_letter', {app_id: APP_ID});
+  if (r.error) { show(msg, r.error, true); return; }
+  document.getElementById('cl-text').value = r.text;
+  clId = r.cover_letter_id;
+  document.getElementById('cl-id').value = clId;
+  document.getElementById('cl-save-btn').style.display = '';
+  show(msg, 'Cover letter generated.', false);
+}
+
+async function saveCoverLetter() {
+  const text = document.getElementById('cl-text').value;
+  const r = await post('/api/cover_letter/update', {cover_letter_id: clId, text});
+  show(document.getElementById('cl-msg'), r.error || 'Saved.', !!r.error);
+}
+
+// ── Scan & Fields ─────────────────────────────────────────────────────────────
+async function scanPage() {
+  const msg = document.getElementById('scan-msg');
+  msg.textContent = 'Scanning…'; msg.className = 'msg';
+  const r = await post('/api/browser/scan', {});
+  if (r.error) { show(msg, r.error, true); return; }
+  scannedFields = r.fields || [];
+  show(msg, `Found ${scannedFields.length} field(s).`, false);
+  renderFields(scannedFields);
+  document.getElementById('push-btn').style.display = scannedFields.length ? '' : 'none';
+}
+
+function renderFields(fields) {
+  const container = document.getElementById('fields-container');
+  container.innerHTML = '';
+  if (!fields.length) { container.textContent = 'No fields found.'; return; }
+
+  fields.forEach((f, i) => {
+    const card = document.createElement('div');
+    card.className = 'field-card';
+    card.dataset.index = i;
+
+    const label = document.createElement('div');
+    label.className = 'field-label';
+    label.textContent = f.label || '(unlabeled)';
+    if (f.required) label.textContent += ' *';
+    card.appendChild(label);
+
+    const meta = document.createElement('div');
+    meta.className = 'field-meta';
+    meta.textContent = `type: ${f.field_type}${f.maxlength ? ' | max: ' + f.maxlength : ''}`;
+    card.appendChild(meta);
+
+    // Previous answers dropdown
+    if (f.previous_answers && f.previous_answers.length) {
+      const sel = document.createElement('select');
+      sel.className = 'prev-select';
+      sel.id = `prev-${i}`;
+      const blank = document.createElement('option');
+      blank.value = ''; blank.textContent = '— previous answers —';
+      sel.appendChild(blank);
+      f.previous_answers.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.answer_text;
+        opt.textContent = `[${a.company_name}] ${a.answer_text.substring(0,60)}`;
+        sel.appendChild(opt);
+      });
+      sel.onchange = () => {
+        if (sel.value) document.getElementById(`ans-${i}`).value = sel.value;
+      };
+      card.appendChild(sel);
+    }
+
+    // Answer textarea
+    const ta = document.createElement('textarea');
+    ta.id = `ans-${i}`;
+    ta.rows = f.field_type === 'textarea' ? 5 : 2;
+    ta.value = f.suggested_value || '';
+    ta.placeholder = 'Answer…';
+    card.appendChild(ta);
+
+    // Generate button (for open-ended fields)
+    if (['textarea','text'].includes(f.field_type) && f.label) {
+      const genBtn = document.createElement('button');
+      genBtn.textContent = 'Generate';
+      genBtn.onclick = async () => {
+        genBtn.disabled = true; genBtn.textContent = 'Generating…';
+        const res = await post('/api/generate/answer', {
+          app_id: APP_ID,
+          question: f.label,
+          field_type: f.field_type,
+          char_limit: f.maxlength || 0,
+        });
+        if (res.error) { alert(res.error); }
+        else {
+          ta.value = res.answer_text;
+          // Populate previous answers dropdown if returned
+          if (res.previous && res.previous.length && !f.previous_answers) {
+            f.previous_answers = res.previous;
+          }
+        }
+        genBtn.disabled = false; genBtn.textContent = 'Regenerate';
+      };
+      card.appendChild(genBtn);
+    }
+
+    container.appendChild(card);
+  });
+}
+
+async function pushToForm() {
+  const pushMsg = document.getElementById('push-msg');
+  const fills = scannedFields.map((f, i) => ({
+    selector: f.selector,
+    value: document.getElementById(`ans-${i}`).value,
+    field_type: f.field_type,
+  })).filter(f => f.value !== '');
+
+  if (!fills.length) { show(pushMsg, 'Nothing to push — fill in some answers first.', true); return; }
+
+  // Save answers to DB
+  for (let i = 0; i < scannedFields.length; i++) {
+    const f = scannedFields[i];
+    const v = document.getElementById(`ans-${i}`).value;
+    if (v && f.label) {
+      await post('/api/save/answer', {
+        app_id: APP_ID,
+        question: f.label,
+        answer_text: v,
+        field_type: f.field_type,
+        source: 'manual',
+      });
+    }
+  }
+
+  pushMsg.textContent = 'Pushing to form…'; pushMsg.className = 'msg';
+  const r = await post('/api/browser/push', {fills});
+  if (r.error) { show(pushMsg, r.error, true); return; }
+  const ok  = (r.results || []).filter(x => x.ok).length;
+  const err = (r.results || []).filter(x => !x.ok).length;
+  show(pushMsg, `Pushed ${ok} field(s).${err ? ' ' + err + ' failed — check the form.' : ''}`, err > 0);
+}
+</script>
+{% endblock %}

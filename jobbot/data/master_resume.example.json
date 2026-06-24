@@ -1,0 +1,39 @@
+{
+  "name": "Your Name",
+  "email": "you@example.com",
+  "phone": "555-555-5555",
+  "location": "City, State",
+  "linkedin": "https://linkedin.com/in/yourprofile",
+  "github": "https://github.com/yourhandle",
+  "portfolio": "",
+  "summary": "Brief professional summary.",
+  "experience": [
+    {
+      "company": "Example Corp",
+      "title": "Software Engineer",
+      "start": "2022-01",
+      "end": "present",
+      "location": "Remote",
+      "bullets": [
+        "Built X, which improved Y by Z%.",
+        "Led migration of legacy system to new architecture."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "institution": "State University",
+      "degree": "B.S. Computer Science",
+      "graduated": "2022",
+      "gpa": ""
+    }
+  ],
+  "skills": {
+    "languages": ["Python", "JavaScript"],
+    "frameworks": ["Flask", "React"],
+    "tools": ["Git", "Docker"],
+    "other": []
+  },
+  "certifications": [],
+  "projects": []
+}
