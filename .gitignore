@@ -37,3 +37,7 @@ Thumbs.db
 tests
 .coverage*
 pytest*
+*.db-shm
+*.db-wal
+jobot_next_phase.md
+jobbot_next_phase.md

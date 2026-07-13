@@ -20,7 +20,7 @@ PDF_DIR.mkdir(parents=True, exist_ok=True)
 
 # Flask
 FLASK_HOST   = "127.0.0.1"
-FLASK_PORT   = 5000
+FLASK_PORT   = 5008
 FLASK_DEBUG  = os.getenv("FLASK_DEBUG", "0") == "1"
 SECRET_KEY   = os.getenv("JOBBOT_SECRET", "change-me-in-production")
 
