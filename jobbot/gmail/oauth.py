@@ -1,9 +1,10 @@
 """
-Google OAuth2 flow for Gmail readonly access.
-Tokens stored in data/gmail_token.json.
+Google OAuth2 for Gmail readonly access — supports two accounts.
+Tokens stored in data/gmail_token_personal.json and data/gmail_token_berkeley.json.
+
+Run setup_gmail_oauth.py once to authorise both accounts.
 """
 
-import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,86 +14,91 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import config
 
 _SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+
 _LAST_SYNC: Optional[str] = None
 
+_ACCOUNTS = {
+    "personal":  config.GMAIL_TOKEN_PERSONAL,   # rluna727@gmail.com
+    "berkeley":  config.GMAIL_TOKEN_BERKELEY,    # rlunaorozco@berkeley.edu
+}
 
-def _load_creds():
-    """Load and auto-refresh stored credentials, or return None if not present."""
+
+def _load_creds(token_path: Path):
+    """Load and auto-refresh stored credentials, or return None."""
     try:
         from google.oauth2.credentials import Credentials
         from google.auth.transport.requests import Request
     except ImportError:
-        raise RuntimeError("google-auth not installed — run: pip install google-auth google-auth-oauthlib google-api-python-client")
+        raise RuntimeError("Run: pip install google-auth google-auth-oauthlib google-api-python-client")
 
-    token_path = config.GMAIL_TOKEN_PATH
     if not token_path.exists():
         return None
 
     creds = Credentials.from_authorized_user_file(str(token_path), _SCOPES)
     if creds and creds.expired and creds.refresh_token:
         creds.refresh(Request())
-        _save_creds(creds)
+        token_path.write_text(creds.to_json())
     return creds if creds and creds.valid else None
 
 
-def _save_creds(creds) -> None:
-    config.GMAIL_TOKEN_PATH.write_text(creds.to_json())
-
-
-def is_connected() -> bool:
+def is_connected(account: str = "personal") -> bool:
     try:
-        return _load_creds() is not None
+        return _load_creds(_ACCOUNTS[account]) is not None
     except Exception:
         return False
+
+
+def connected_accounts() -> list[str]:
+    """Return list of account keys that have valid tokens."""
+    return [name for name in _ACCOUNTS if is_connected(name)]
 
 
 def get_last_sync() -> Optional[str]:
     return _LAST_SYNC
 
 
-def start_oauth_flow(callback_url: str) -> str:
-    """Return the Google authorization URL to redirect the user to."""
-    from google_auth_oauthlib.flow import Flow  # type: ignore
+def get_gmail_service(account: str = "personal"):
+    """Return an authorized Gmail API service for the given account."""
+    from googleapiclient.discovery import build  # type: ignore
 
-    if not config.GMAIL_CREDENTIALS_PATH.exists():
-        raise FileNotFoundError(
-            f"Gmail credentials file not found at {config.GMAIL_CREDENTIALS_PATH}. "
-            "Download it from Google Cloud Console (OAuth 2.0 client secret)."
+    token_path = _ACCOUNTS.get(account)
+    if not token_path:
+        raise ValueError(f"Unknown account '{account}'. Choose from: {list(_ACCOUNTS)}")
+
+    creds = _load_creds(token_path)
+    if not creds:
+        raise RuntimeError(
+            f"Gmail not connected for '{account}'. "
+            "Run: python setup_gmail_oauth.py"
         )
 
-    flow = Flow.from_client_secrets_file(
-        str(config.GMAIL_CREDENTIALS_PATH),
-        scopes=_SCOPES,
-        redirect_uri=callback_url,
+    global _LAST_SYNC
+    _LAST_SYNC = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    return build("gmail", "v1", credentials=creds, cache_discovery=False)
+
+
+def get_all_gmail_services() -> dict:
+    """Return {account_name: service} for every connected account."""
+    services = {}
+    for name in _ACCOUNTS:
+        try:
+            services[name] = get_gmail_service(name)
+        except Exception:
+            pass
+    return services
+
+
+# ── Legacy Flask OAuth (kept for reference, not used) ─────────────────────────
+# The installed-app flow requires setup_gmail_oauth.py, not a web callback.
+
+def start_oauth_flow(callback_url: str) -> str:
+    raise NotImplementedError(
+        "Flask OAuth callback not supported for installed-app credentials. "
+        "Run setup_gmail_oauth.py to authorise Gmail access."
     )
-    auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline")
-    # Store the flow state in a temp file so finish_oauth_flow can use it
-    state_path = config.DATA_DIR / "gmail_oauth_state.json"
-    state_path.write_text(json.dumps({"redirect_uri": callback_url}))
-    return auth_url
 
 
 def finish_oauth_flow(code: str, callback_url: str) -> None:
-    """Exchange the auth code for tokens and persist them."""
-    from google_auth_oauthlib.flow import Flow  # type: ignore
-
-    flow = Flow.from_client_secrets_file(
-        str(config.GMAIL_CREDENTIALS_PATH),
-        scopes=_SCOPES,
-        redirect_uri=callback_url,
+    raise NotImplementedError(
+        "Flask OAuth callback not supported. Run setup_gmail_oauth.py."
     )
-    flow.fetch_token(code=code)
-    _save_creds(flow.credentials)
-
-
-def get_gmail_service():
-    """Return an authorized Gmail API service object."""
-    from googleapiclient.discovery import build  # type: ignore
-
-    creds = _load_creds()
-    if not creds:
-        raise RuntimeError("Gmail not connected. Visit /gmail/auth to authorise.")
-    service = build("gmail", "v1", credentials=creds, cache_discovery=False)
-    global _LAST_SYNC
-    _LAST_SYNC = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    return service

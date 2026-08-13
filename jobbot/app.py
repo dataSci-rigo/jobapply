@@ -391,6 +391,22 @@ def api_browser_login():
         return jsonify(error=str(exc)), 500
 
 
+@app.route("/api/browser/google_login", methods=["POST"])
+def api_browser_google_login():
+    """Log into a site using Google SSO ('Continue with Google' button)."""
+    data = request.json or {}
+    url  = data.get("url", "").strip()
+    if not url:
+        return jsonify(error="url required"), 400
+    try:
+        page   = get_driver().get_page()
+        result = cred_store.google_sso_login(page, url)
+        status = 200 if result.get("ok") else (400 if "not supported" in result.get("error", "") else 500)
+        return jsonify(result), status
+    except Exception as exc:
+        return jsonify(error=str(exc)), 500
+
+
 @app.route("/api/browser/submit_otp", methods=["POST"])
 def api_browser_submit_otp():
     """Submit a one-time code on the current page."""

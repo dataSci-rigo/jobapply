@@ -57,6 +57,13 @@ SITE_CONFIGS = {
         "logged_in_check": "https://www.indeed.com",
         "otp_selectors": ['input[name="code"]', 'input[autocomplete="one-time-code"]'],
         "otp_submit":    ['button[type="submit"]'],
+        "sso_google":    [
+            '[data-tn-element="google-auth-button"]',
+            '.icl-SocialLoginButton--google',
+            'a[aria-label*="Google"]',
+            'button[aria-label*="Google"]',
+            'a[data-tn-element*="google"]',
+        ],
     },
     "https://www.glassdoor.com": {
         "name":       "Glassdoor",
@@ -263,6 +270,95 @@ def auto_login(page, url: str) -> dict:
             return {"ok": False, "error": "Login failed — check username and password."}
 
         return {"ok": True, "logged_in": True, "site_name": cfg.get("name", url)}
+
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def google_sso_login(page, url: str) -> dict:
+    """
+    Log into a site using "Continue with Google" SSO.
+
+    Requires the browser profile to already be signed into Google
+    (works automatically when CHROME_PROFILE_DIR points at a persistent profile).
+
+    Flow:
+      1. Navigate to the site's login page.
+      2. Click the "Continue with Google" button.
+      3. If Google opens in a popup: wait for the popup to close (Google completes
+         the consent/account-picker step and redirects back).
+      4. If Google redirects in the same tab: wait for networkidle.
+      5. Detect success or failure.
+
+    Returns:
+        {"ok": True, "logged_in": True, "site_name": ...}    — success
+        {"ok": True, "needs_account": True, "url": ...}      — Google account picker
+                                                               still open (rare)
+        {"ok": False, "error": "..."}                        — site not supported /
+                                                               button not found / timeout
+    """
+    cfg = find_site_config(url)
+    if cfg is None:
+        return {"ok": False, "error": f"No site config for {url}. Google SSO not supported here."}
+
+    sso_sels = cfg.get("sso_google")
+    if not sso_sels:
+        return {"ok": False, "error": f"{cfg.get('name', url)} does not have a Google SSO button configured."}
+
+    try:
+        page.goto(cfg["login_url"], wait_until="domcontentloaded", timeout=30_000)
+        time.sleep(1.5)
+
+        google_btn = _try_selector(page, sso_sels, timeout=5_000)
+        if not google_btn:
+            return {"ok": False,
+                    "error": "Could not find 'Continue with Google' button — the login page may have changed."}
+
+        # Google SSO can open in a popup (most common) or redirect in the same tab.
+        # Use expect_popup with a short timeout; fall back to same-tab redirect.
+        try:
+            with page.expect_popup(timeout=6_000) as popup_info:
+                google_btn.click()
+            popup = popup_info.value
+
+            # Wait up to 60 s for the Google popup to finish and close itself.
+            # If the user is already signed in and has previously consented,
+            # the popup closes automatically. Otherwise they may need to pick an account.
+            try:
+                popup.wait_for_event("close", timeout=60_000)
+            except Exception:
+                # Popup is still open — probably the account picker
+                cur_popup = popup.url
+                return {
+                    "ok": True,
+                    "needs_account": True,
+                    "url": cur_popup,
+                    "msg": "Google account picker is open — select your account in the browser window.",
+                }
+
+        except Exception:
+            # No popup appeared — Google may be redirecting in the same tab
+            try:
+                page.wait_for_load_state("networkidle", timeout=30_000)
+            except Exception:
+                pass
+
+        # Wait for the site to finish loading after Google hands back control
+        time.sleep(1.5)
+        try:
+            page.wait_for_load_state("networkidle", timeout=10_000)
+        except Exception:
+            pass
+
+        cur = page.url
+        site_name = cfg.get("name", url)
+
+        # If still on the login page, SSO didn't complete
+        if google_btn and _try_selector(page, sso_sels, timeout=1_500):
+            return {"ok": False,
+                    "error": f"Still on {site_name} login page — Google SSO did not complete."}
+
+        return {"ok": True, "logged_in": True, "site_name": site_name, "url": cur}
 
     except Exception as exc:
         return {"ok": False, "error": str(exc)}

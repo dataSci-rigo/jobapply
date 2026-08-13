@@ -7,6 +7,14 @@ jobbot/data/pdfs/
 jobbot/data/gmail_credentials.json
 jobbot/data/gmail_token.json
 jobbot/data/gmail_oauth_state.json
+jobbot/data/.secret_key
+jobbot/data/credentials.json
+
+# ── Google credential files (if copied here) ──────────────────────────────────
+client_secret*.json
+*-service-account*.json
+lyrical-star*.json
+service_account*.json
 
 # ── Secrets / env ─────────────────────────────────────────────────────────────
 .env
@@ -41,3 +49,4 @@ pytest*
 *.db-wal
 jobot_next_phase.md
 jobbot_next_phase.md
+'Two bugs fixed.txt'
