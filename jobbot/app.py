@@ -401,7 +401,7 @@ def api_browser_google_login():
     try:
         page   = get_driver().get_page()
         result = cred_store.google_sso_login(page, url)
-        status = 200 if result.get("ok") else (400 if "not supported" in result.get("error", "") else 500)
+        status = 200 if result.get("ok") else (400 if result.get("code") in ("unsupported", "no_sso_button") else 500)
         return jsonify(result), status
     except Exception as exc:
         return jsonify(error=str(exc)), 500
@@ -472,35 +472,20 @@ def api_discover_discard(lead_id: int):
 
 @app.route("/gmail", methods=["GET"])
 def gmail_setup():
-    from gmail.oauth import is_connected, get_last_sync
+    from gmail.oauth import connected_accounts, get_last_sync
     creds_file_exists = config.GMAIL_CREDENTIALS_PATH.exists()
-    connected = is_connected()
+    accounts = connected_accounts()
+    connected = bool(accounts)
     syncs = [dict(s) for s in store.list_gmail_syncs()] if connected else []
     return render_template(
         "gmail_setup.html",
         connected=connected,
+        accounts=accounts,
         creds_file_exists=creds_file_exists,
         last_sync=get_last_sync(),
         syncs=syncs,
         sync_days=config.GMAIL_SYNC_DAYS,
     )
-
-
-@app.route("/gmail/auth", methods=["GET"])
-def gmail_auth():
-    from gmail.oauth import start_oauth_flow
-    auth_url = start_oauth_flow(callback_url=url_for("gmail_callback", _external=True))
-    return redirect(auth_url)
-
-
-@app.route("/gmail/callback", methods=["GET"])
-def gmail_callback():
-    from gmail.oauth import finish_oauth_flow
-    code = request.args.get("code", "")
-    if not code:
-        return "OAuth cancelled or failed.", 400
-    finish_oauth_flow(code, callback_url=url_for("gmail_callback", _external=True))
-    return redirect(url_for("gmail_setup"))
 
 
 @app.route("/api/gmail/sync", methods=["POST"])
@@ -541,8 +526,9 @@ def api_gmail_sync():
 
 @app.route("/gmail/status", methods=["GET"])
 def gmail_status():
-    from gmail.oauth import is_connected, get_last_sync
-    return jsonify(connected=is_connected(), last_sync=get_last_sync())
+    from gmail.oauth import connected_accounts, get_last_sync
+    accounts = connected_accounts()
+    return jsonify(connected=bool(accounts), accounts=accounts, last_sync=get_last_sync())
 
 
 # ── Dev / Debug ────────────────────────────────────────────────────────────────

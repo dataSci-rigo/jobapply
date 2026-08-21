@@ -198,6 +198,14 @@ def _try_selector(page, selectors: list[str], timeout: int = 3_000):
     return None
 
 
+def _settle(page, timeout: int = 10_000) -> None:
+    """Wait for the network to go idle; never raises."""
+    try:
+        page.wait_for_load_state("networkidle", timeout=timeout)
+    except Exception:
+        pass
+
+
 def auto_login(page, url: str) -> dict:
     """
     Navigate to url and fill the login form using saved credentials.
@@ -238,10 +246,10 @@ def auto_login(page, url: str) -> dict:
             return {"ok": False,
                     "error": "Could not find username/password fields — log in manually."}
 
-        user_el.triple_click()
+        user_el.click(click_count=3)
         user_el.type(cred["username"], delay=40)
         time.sleep(0.2)
-        pass_el.triple_click()
+        pass_el.click(click_count=3)
         pass_el.type(cred["password"], delay=40)
         time.sleep(0.2)
 
@@ -252,10 +260,7 @@ def auto_login(page, url: str) -> dict:
             pass_el.press("Enter")
 
         # Wait for navigation
-        try:
-            page.wait_for_load_state("networkidle", timeout=15_000)
-        except Exception:
-            pass
+        _settle(page, timeout=15_000)
 
         cur = page.url
         # 2FA / checkpoint detection
@@ -299,19 +304,20 @@ def google_sso_login(page, url: str) -> dict:
     """
     cfg = find_site_config(url)
     if cfg is None:
-        return {"ok": False, "error": f"No site config for {url}. Google SSO not supported here."}
+        return {"ok": False, "code": "unsupported",
+                "error": f"No site config for {url}. Google SSO not supported here."}
 
     sso_sels = cfg.get("sso_google")
     if not sso_sels:
-        return {"ok": False, "error": f"{cfg.get('name', url)} does not have a Google SSO button configured."}
+        return {"ok": False, "code": "no_sso_button",
+                "error": f"{cfg.get('name', url)} does not have a Google SSO button configured."}
 
     try:
         page.goto(cfg["login_url"], wait_until="domcontentloaded", timeout=30_000)
-        time.sleep(1.5)
 
-        google_btn = _try_selector(page, sso_sels, timeout=5_000)
+        google_btn = _try_selector(page, sso_sels, timeout=6_000)
         if not google_btn:
-            return {"ok": False,
+            return {"ok": False, "code": "button_not_found",
                     "error": "Could not find 'Continue with Google' button — the login page may have changed."}
 
         # Google SSO can open in a popup (most common) or redirect in the same tab.
@@ -328,40 +334,33 @@ def google_sso_login(page, url: str) -> dict:
                 popup.wait_for_event("close", timeout=60_000)
             except Exception:
                 # Popup is still open — probably the account picker
-                cur_popup = popup.url
                 return {
                     "ok": True,
                     "needs_account": True,
-                    "url": cur_popup,
+                    "url": popup.url,
                     "msg": "Google account picker is open — select your account in the browser window.",
                 }
 
         except Exception:
             # No popup appeared — Google may be redirecting in the same tab
-            try:
-                page.wait_for_load_state("networkidle", timeout=30_000)
-            except Exception:
-                pass
+            _settle(page, timeout=30_000)
 
         # Wait for the site to finish loading after Google hands back control
-        time.sleep(1.5)
-        try:
-            page.wait_for_load_state("networkidle", timeout=10_000)
-        except Exception:
-            pass
+        _settle(page)
 
-        cur = page.url
         site_name = cfg.get("name", url)
 
-        # If still on the login page, SSO didn't complete
-        if google_btn and _try_selector(page, sso_sels, timeout=1_500):
-            return {"ok": False,
+        # Success check by URL: only a page still sitting on the login URL means
+        # SSO didn't complete. (Re-scanning for Google-labelled elements false-
+        # negatives on logged-in pages with e.g. "Get it on Google Play" links.)
+        if page.url.split("?")[0].rstrip("/") == cfg["login_url"].split("?")[0].rstrip("/"):
+            return {"ok": False, "code": "sso_incomplete",
                     "error": f"Still on {site_name} login page — Google SSO did not complete."}
 
-        return {"ok": True, "logged_in": True, "site_name": site_name, "url": cur}
+        return {"ok": True, "logged_in": True, "site_name": site_name, "url": page.url}
 
     except Exception as exc:
-        return {"ok": False, "error": str(exc)}
+        return {"ok": False, "code": "exception", "error": str(exc)}
 
 
 def submit_otp(page, url: str, otp: str) -> dict:
@@ -376,7 +375,7 @@ def submit_otp(page, url: str, otp: str) -> dict:
         if not pin_el:
             return {"ok": False, "error": "Could not find OTP input field."}
 
-        pin_el.triple_click()
+        pin_el.click(click_count=3)
         pin_el.type(otp, delay=60)
         time.sleep(0.2)
 
@@ -386,10 +385,7 @@ def submit_otp(page, url: str, otp: str) -> dict:
         else:
             pin_el.press("Enter")
 
-        try:
-            page.wait_for_load_state("networkidle", timeout=15_000)
-        except Exception:
-            pass
+        _settle(page, timeout=15_000)
 
         cur = page.url
         if any(k in cur for k in ("checkpoint", "challenge", "two-step", "verification", "otp")):

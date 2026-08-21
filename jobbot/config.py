@@ -46,5 +46,4 @@ SCRAPE_HOUR           = int(os.getenv("SCRAPE_HOUR", "8"))   # daily scrape hour
 GMAIL_CREDENTIALS_PATH   = DATA_DIR / "gmail_credentials.json"
 GMAIL_TOKEN_PERSONAL     = DATA_DIR / "gmail_token_personal.json"   # rluna727@gmail.com
 GMAIL_TOKEN_BERKELEY     = DATA_DIR / "gmail_token_berkeley.json"   # rlunaorozco@berkeley.edu
-GMAIL_TOKEN_PATH         = GMAIL_TOKEN_PERSONAL                     # legacy alias
 GMAIL_SYNC_DAYS          = int(os.getenv("GMAIL_SYNC_DAYS", "14"))

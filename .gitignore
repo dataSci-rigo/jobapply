@@ -1,14 +1,8 @@
 # ── Personal data (never commit) ──────────────────────────────────────────────
-jobbot/data/master_resume.json
-jobbot/data/preferences.json
-jobbot/data/star.json
-jobbot/data/jobbot.db
-jobbot/data/pdfs/
-jobbot/data/gmail_credentials.json
-jobbot/data/gmail_token.json
-jobbot/data/gmail_oauth_state.json
-jobbot/data/.secret_key
-jobbot/data/credentials.json
+# Everything in jobbot/data/ is secret by default; only *.example.json templates
+# are tracked. New token/credential files are safe without a gitignore edit.
+jobbot/data/*
+!jobbot/data/*.example.json
 
 # ── Google credential files (if copied here) ──────────────────────────────────
 client_secret*.json
@@ -49,4 +43,4 @@ pytest*
 *.db-wal
 jobot_next_phase.md
 jobbot_next_phase.md
-'Two bugs fixed.txt'
+Two bugs fixed.txt

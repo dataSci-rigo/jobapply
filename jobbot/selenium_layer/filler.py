@@ -41,9 +41,9 @@ class FieldFiller:
 
     def _fill_text(self, el, selector: str, value: str) -> None:
         el.scroll_into_view_if_needed(timeout=self.timeout)
-        el.click(timeout=self.timeout)
-        # Select-all + type (triple-click selects all text in the field)
-        el.triple_click(timeout=self.timeout)
+        # Select-all + type (triple-click selects all text in the field);
+        # Locator has no triple_click method — use click_count=3
+        el.click(click_count=3, timeout=self.timeout)
         el.type(value, delay=30)   # delay=30ms mimics human typing pace
 
         # Trigger React/Vue synthetic change event

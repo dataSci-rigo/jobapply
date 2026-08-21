@@ -6,19 +6,23 @@
 
 <div class="card" style="max-width:480px;margin-bottom:1.5rem">
   {% if connected %}
-  <p class="msg ok">Connected to Gmail ✓</p>
+  <p class="msg ok">Connected ✓
+    {% for acc in accounts %}<span class="badge">{{ acc }}</span> {% endfor %}
+  </p>
+  {% if accounts|length < 2 %}
+  <p class="msg err">Only {{ accounts|length }} of 2 accounts connected — run <code>python setup_gmail_oauth.py</code> to add the other.</p>
+  {% endif %}
   <p>Last sync: {{ last_sync or 'never' }}</p>
   <button class="btn-primary" id="btn-sync" onclick="syncGmail()">Sync now</button>
   <span id="sync-msg" class="msg"></span>
-  <hr>
-  <a href="{{ url_for('gmail_auth') }}" class="btn-sm">Re-authorise</a>
   {% else %}
   <p>Not connected.</p>
   {% if not creds_file_exists %}
-  <p class="msg err">Place your <code>gmail_credentials.json</code> (Google OAuth client secret) in <code>data/</code> before connecting.</p>
-  {% else %}
-  <a href="{{ url_for('gmail_auth') }}" class="btn-primary">Connect Gmail →</a>
+  <p class="msg err">Place your <code>gmail_credentials.json</code> (Google OAuth client secret) in <code>data/</code> first.</p>
   {% endif %}
+  <p>To connect, run on the laptop (a browser will open for each account):</p>
+  <pre><code>python setup_gmail_oauth.py</code></pre>
+  <p>Then reload this page.</p>
   {% endif %}
 </div>
 
