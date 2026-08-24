@@ -36,6 +36,7 @@ def _start() -> None:
     _pw      = sync_playwright().start()
     launch_args = {
         "headless": False,
+        "channel": "chrome",   # real Chrome — Patchright's recommended stealth setup
         "args": ["--start-maximized"],
     }
     if config.CHROME_PROFILE_DIR:
@@ -43,6 +44,7 @@ def _start() -> None:
         _context = _pw.chromium.launch_persistent_context(
             config.CHROME_PROFILE_DIR,
             headless=False,
+            channel="chrome",
             args=["--start-maximized"],
             no_viewport=True,
         )

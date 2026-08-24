@@ -144,7 +144,7 @@ def main() -> None:
     from patchright.sync_api import sync_playwright
     with sync_playwright() as pw:
         ctx = pw.chromium.launch_persistent_context(
-            str(PROFILE_DIR), headless=False,
+            str(PROFILE_DIR), headless=False, channel="chrome",
             args=["--start-maximized"], no_viewport=True)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         for i, link in enumerate(links, 1):
