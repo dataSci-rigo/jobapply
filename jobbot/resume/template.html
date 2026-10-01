@@ -125,6 +125,9 @@
 {% if r.skills.frameworks %}
 <div class="skills-row"><span class="skills-label">Frameworks:</span> {{ r.skills.frameworks | join(", ") }}</div>
 {% endif %}
+{% if r.skills.ml %}
+<div class="skills-row"><span class="skills-label">Machine Learning:</span> {{ r.skills.ml | join(", ") }}</div>
+{% endif %}
 {% if r.skills.tools %}
 <div class="skills-row"><span class="skills-label">Tools:</span> {{ r.skills.tools | join(", ") }}</div>
 {% endif %}

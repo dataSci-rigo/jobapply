@@ -162,8 +162,19 @@ def list_credentials() -> list[dict]:
 
 
 def add_credential(site: str, username: str, password: str, notes: str = "") -> None:
-    entries = [e for e in _load_vault() if e["site"].rstrip("/") != site.rstrip("/")]
-    entries.append({"site": site.rstrip("/"), "username": username,
+    """
+    Store one account for a site.
+
+    Keyed on (site, username) so several accounts can coexist on the same site —
+    two Indeed logins, say. Re-adding the same username on the same site updates
+    that entry in place and leaves the others alone.
+    """
+    site = site.rstrip("/")
+    entries = [
+        e for e in _load_vault()
+        if not (e["site"].rstrip("/") == site and e["username"] == username)
+    ]
+    entries.append({"site": site, "username": username,
                     "password": password, "notes": notes})
     _save_vault(entries)
 
@@ -177,11 +188,32 @@ def delete_credential(index: int) -> bool:
     return False
 
 
-def find_credential(url: str) -> Optional[dict]:
-    for entry in _load_vault():
-        if url.startswith(entry["site"]):
-            return entry
-    return None
+def find_credential(url: str, username: Optional[str] = None) -> Optional[dict]:
+    """
+    Return the stored account for url, or None.
+
+    Matches entries whose site is a prefix of url, longest prefix first, so a
+    more specific entry beats a broader one. When several accounts are stored
+    for the same site, `username` selects between them; without it the first
+    match wins, which is only unambiguous when the site has a single account.
+    Use list_site_accounts() to enumerate the choices.
+    """
+    candidates = [e for e in _load_vault() if url.startswith(e["site"])]
+    candidates.sort(key=lambda e: len(e["site"]), reverse=True)
+    if username:
+        for entry in candidates:
+            if entry["username"] == username:
+                return entry
+        return None
+    return candidates[0] if candidates else None
+
+
+def list_site_accounts(url: str) -> list[dict]:
+    """Every stored account whose site is a prefix of url (longest prefix first)."""
+    candidates = [e for e in _load_vault() if url.startswith(e["site"])]
+    candidates.sort(key=lambda e: len(e["site"]), reverse=True)
+    return [{"site": e["site"], "username": e["username"], "notes": e.get("notes", "")}
+            for e in candidates]
 
 
 # ── Patchright auto-login ──────────────────────────────────────────────────────
@@ -206,9 +238,11 @@ def _settle(page, timeout: int = 10_000) -> None:
         pass
 
 
-def auto_login(page, url: str) -> dict:
+def auto_login(page, url: str, username: Optional[str] = None) -> dict:
     """
     Navigate to url and fill the login form using saved credentials.
+
+    Pass `username` to pick between several accounts stored for the same site.
 
     Returns:
         {"ok": True, "logged_in": True}             — success
@@ -217,8 +251,12 @@ def auto_login(page, url: str) -> dict:
 
     Raises nothing — all exceptions captured into the return dict.
     """
-    cred = find_credential(url)
+    cred = find_credential(url, username)
     if not cred:
+        accounts = [a["username"] for a in list_site_accounts(url)]
+        if accounts and username:
+            return {"ok": False, "error": f"No credential for {username} at {url}. "
+                                          f"Stored accounts: {', '.join(accounts)}"}
         return {"ok": False, "error": f"No saved credentials for {url}"}
 
     cfg = find_site_config(url)
@@ -280,12 +318,17 @@ def auto_login(page, url: str) -> dict:
         return {"ok": False, "error": str(exc)}
 
 
-def google_sso_login(page, url: str) -> dict:
+def google_sso_login(page, url: str, username: Optional[str] = None) -> dict:
     """
     Log into a site using "Continue with Google" SSO.
 
     Requires the browser profile to already be signed into Google
     (works automatically when CHROME_PROFILE_DIR points at a persistent profile).
+
+    Pass `username` when the profile holds more than one Google account: it is
+    echoed back in the needs_account response so the caller can say which account
+    to pick, and reported on success as the account the session is believed to be
+    under. Google owns the account choice, so this is advisory, not enforced.
 
     Flow:
       1. Navigate to the site's login page.
@@ -338,7 +381,10 @@ def google_sso_login(page, url: str) -> dict:
                     "ok": True,
                     "needs_account": True,
                     "url": popup.url,
-                    "msg": "Google account picker is open — select your account in the browser window.",
+                    "account": username,
+                    "msg": (f"Google account picker is open — select {username} "
+                            f"in the browser window." if username else
+                            "Google account picker is open — select your account in the browser window."),
                 }
 
         except Exception:
@@ -357,7 +403,8 @@ def google_sso_login(page, url: str) -> dict:
             return {"ok": False, "code": "sso_incomplete",
                     "error": f"Still on {site_name} login page — Google SSO did not complete."}
 
-        return {"ok": True, "logged_in": True, "site_name": site_name, "url": page.url}
+        return {"ok": True, "logged_in": True, "site_name": site_name,
+                "account": username, "url": page.url}
 
     except Exception as exc:
         return {"ok": False, "code": "exception", "error": str(exc)}

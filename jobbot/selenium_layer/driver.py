@@ -29,6 +29,34 @@ _context = None
 _page    = None
 
 
+class ProfileInUseError(RuntimeError):
+    """CHROME_PROFILE_DIR is locked by another Chrome instance."""
+
+
+def _profile_holder() -> Optional[str]:
+    """
+    Return a description of the process already holding CHROME_PROFILE_DIR, or None.
+
+    Chrome locks a whole user-data-dir, so any other tool driving the same profile
+    blocks us — and the raw Playwright error ("Opening in existing browser session")
+    doesn't say who. Name the culprit so the fix is obvious.
+    """
+    import subprocess
+    try:
+        out = subprocess.run(
+            ["pgrep", "-af", f"user-data-dir={config.CHROME_PROFILE_DIR}"],
+            capture_output=True, text=True, timeout=5,
+        ).stdout
+    except Exception:
+        return None
+    for line in out.splitlines():
+        pid, _, cmd = line.partition(" ")
+        if "chrome_crashpad" in cmd or "--type=" in cmd:
+            continue   # helper/renderer processes, not the session owner
+        return f"pid {pid}"
+    return None
+
+
 def _start() -> None:
     global _pw, _browser, _context, _page
     from patchright.sync_api import sync_playwright
@@ -40,14 +68,33 @@ def _start() -> None:
         "args": ["--start-maximized"],
     }
     if config.CHROME_PROFILE_DIR:
+        args = ["--start-maximized"]
+        # Pick which account's sub-profile inside the user-data-dir to open.
+        # A Chrome user-data-dir holds several profiles ("Default", "Profile 1", …),
+        # each signed into different Google accounts — this selects one.
+        if config.CHROME_PROFILE_DIRECTORY:
+            args.append(f"--profile-directory={config.CHROME_PROFILE_DIRECTORY}")
         # Persistent context keeps login sessions across restarts without cookie files
-        _context = _pw.chromium.launch_persistent_context(
-            config.CHROME_PROFILE_DIR,
-            headless=False,
-            channel="chrome",
-            args=["--start-maximized"],
-            no_viewport=True,
-        )
+        try:
+            _context = _pw.chromium.launch_persistent_context(
+                config.CHROME_PROFILE_DIR,
+                headless=False,
+                channel="chrome",
+                args=args,
+                no_viewport=True,
+            )
+        except Exception as exc:
+            if "already in use" in str(exc) or "existing browser session" in str(exc):
+                holder = _profile_holder()
+                _pw.stop()
+                _pw = None
+                raise ProfileInUseError(
+                    f"Chrome profile {config.CHROME_PROFILE_DIR} is already open"
+                    + (f" by {holder}" if holder else "")
+                    + ". Close that Chrome, or point CHROME_PROFILE_DIR at a "
+                      "profile directory of its own for this app."
+                ) from exc
+            raise
         _browser = None  # persistent context owns the browser
         _page    = _context.pages[0] if _context.pages else _context.new_page()
     else:

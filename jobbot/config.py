@@ -5,6 +5,41 @@ BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"
 DB_PATH = DATA_DIR / "jobbot.db"
 
+
+# ── .env loading ───────────────────────────────────────────────────────────────
+# Only the standalone setup scripts used to read .env, each with its own parser,
+# so the Flask app silently ignored every .env-configured setting below
+# (CHROME_PROFILE_DIR, JOBSPY_*, SCRAPE_HOUR, GMAIL_SYNC_DAYS, JOBBOT_SECRET).
+# Load it here, before the os.getenv calls. Real environment variables win, so
+# `SCRAPE_HOUR=9 python apply2jobs.py` still overrides the file.
+
+# Most specific wins: the project's own .env is read first, then the shared
+# master .env at the Documents root fills in anything it didn't set. That lets
+# this app override a shared value (CHROME_PROFILE_DIR, say) without editing the
+# master file that every other project reads.
+_ENV_FILES = [
+    Path(__file__).parent.parent / ".env",          # apply2jobs/.env  (wins)
+    Path(__file__).parent.parent.parent / ".env",   # /home/ai1/Documents/.env
+]
+
+
+def _load_env_files() -> None:
+    for path in _ENV_FILES:
+        if not path.exists():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            # First file wins, and a real env var always wins over both.
+            os.environ.setdefault(key, value)
+
+
+_load_env_files()
+
 # Anthropic models — pin from docs.claude.com
 GENERATION_MODEL = "claude-sonnet-4-6"   # resume / cover letter / answers
 MATCHING_MODEL   = "claude-haiku-4-5-20251001"    # cheap normalization tasks
@@ -26,6 +61,11 @@ SECRET_KEY   = os.getenv("JOBBOT_SECRET", "change-me-in-production")
 
 # Selenium
 CHROME_PROFILE_DIR = os.getenv("CHROME_PROFILE_DIR", "")   # empty = temp profile
+# Which sub-profile inside CHROME_PROFILE_DIR to open. A user-data-dir holds
+# several ("Default", "Profile 1", …), each signed into a different Google
+# account — this is how you choose which account Google SSO logs in as.
+# Empty = Chrome's own default ("Default").
+CHROME_PROFILE_DIRECTORY = os.getenv("CHROME_PROFILE_DIRECTORY", "")
 USE_UNDETECTED_CD  = True   # use undetected-chromedriver
 
 # Fuzzy matching threshold (rapidfuzz token_sort_ratio)

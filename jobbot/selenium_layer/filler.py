@@ -24,11 +24,16 @@ class FieldFiller:
         if not selector:
             raise ValueError("Empty selector — cannot fill field.")
 
-        el = self._find(selector)
-
+        # A file input is almost always hidden behind a styled "Upload" button,
+        # so _find()'s visibility wait would reject it — and set_input_files
+        # doesn't need it visible.
         if field_type == "file":
             self._fill_file(selector, value)
-        elif field_type == "select":
+            return
+
+        el = self._find(selector)
+
+        if field_type == "select":
             self._fill_select(el, selector, value)
         elif field_type == "checkbox":
             self._fill_checkbox(el, value)

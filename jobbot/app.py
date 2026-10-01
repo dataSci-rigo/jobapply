@@ -5,7 +5,9 @@ Run single-process (threaded=False) to keep the Patchright browser safe.
 
 import json
 import os
+import re
 import sys
+import time
 from pathlib import Path
 
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
@@ -311,6 +313,131 @@ def api_browser_current_url():
         return jsonify(error=str(exc)), 500
 
 
+# Button text that marks the site's final submit. The spec's hard rule is that
+# this panel never submits an application — the human clicks Submit — so the
+# click route refuses a button that reads like one. "Apply" only counts inside a
+# form or dialog: on a job page it opens the application, inside the application
+# it sends it. Only real buttons are judged on their text, so a Gmail row whose
+# subject says "Confirm your interview" still clicks.
+_SUBMIT_TEXT = re.compile(r"\b(submit|send|finish|complete|confirm)\b", re.I)
+_APPLY_TEXT  = re.compile(r"\bapply\b", re.I)
+
+
+@app.route("/api/browser/click", methods=["POST"])
+def api_browser_click():
+    """
+    Click something on the current page, by CSS selector or by visible text.
+
+    Many app UIs (Gmail rows, custom listboxes, 'Easy Apply' buttons) aren't
+    anchors, so navigate() can't reach them. Pass {"selector": "..."} or
+    {"text": "..."} — text does a substring match on the first visible element
+    containing it — and optionally {"nth": N} to pick a later match.
+
+    Never submits: refuses a submit button that belongs to a form, and any
+    button whose text reads like a final submit (_SUBMIT_TEXT / _APPLY_TEXT).
+    """
+    data     = request.json or {}
+    selector = (data.get("selector") or "").strip()
+    text     = (data.get("text") or "").strip()
+    nth      = data.get("nth", 0)
+    if not selector and not text:
+        return jsonify(error="selector or text required"), 400
+    try:
+        page = get_driver().get_page()
+        loc  = page.locator(selector) if selector else page.get_by_text(text, exact=False)
+        loc  = loc.nth(nth)
+        loc.scroll_into_view_if_needed(timeout=8_000)
+        button = loc.evaluate("""e => {
+            const b = e.closest('button, [role=button], input[type=submit], input[type=button]');
+            if (!b) return null;
+            return {
+                text:    (b.innerText || b.value || '').trim().slice(0, 120),
+                submits: b.type === 'submit' && !!b.form,
+                in_form: !!(b.form || b.closest(
+                    'form, [role=dialog], [aria-modal=true], .modal, mat-dialog-container')),
+            };
+        }""")
+        if button and (button["submits"] or _SUBMIT_TEXT.search(button["text"])
+                       or (button["in_form"] and _APPLY_TEXT.search(button["text"]))):
+            return jsonify(ok=False, target=button,
+                           error="Refusing to click a submit control — the human submits."), 403
+        loc.click(timeout=8_000)
+        page.wait_for_timeout(2_500)
+        return jsonify(ok=True, url=page.url, title=page.title())
+    except Exception as exc:
+        return jsonify(ok=False, error=str(exc)[:400]), 500
+
+
+@app.route("/api/browser/links", methods=["GET"])
+def api_browser_links():
+    """
+    Read-only: every anchor on the current page as {text, href}.
+
+    page_text shows what a page says; this shows where it can go — needed to
+    follow a link (an 'Apply' or 'Complete' button) without a screenshot.
+    Pass ?contains= to filter on link text or href, case-insensitive.
+    """
+    needle = (request.args.get("contains") or "").lower()
+    try:
+        page  = get_driver().get_page()
+        links = page.eval_on_selector_all(
+            "a[href]",
+            "els => els.map(e => ({text: (e.innerText||'').trim().slice(0,120), href: e.href}))",
+        )
+        if needle:
+            links = [l for l in links
+                     if needle in l["text"].lower() or needle in l["href"].lower()]
+        seen, unique = set(), []
+        for l in links:
+            if l["href"] not in seen:
+                seen.add(l["href"])
+                unique.append(l)
+        return jsonify(url=page.url, count=len(unique), links=unique[:200])
+    except Exception as exc:
+        return jsonify(error=str(exc)), 500
+
+
+@app.route("/api/browser/page_text", methods=["GET"])
+def api_browser_page_text():
+    """
+    Read-only: the current page's visible text and title.
+
+    Lets a caller see what the browser is actually looking at — whether a login
+    wall is up, what an applied-jobs list contains — without a screenshot.
+    Truncated to keep responses bounded; pass ?limit= to change it.
+    """
+    limit = request.args.get("limit", default=20_000, type=int)
+    try:
+        page = get_driver().get_page()
+        text = page.inner_text("body")
+        return jsonify(
+            url=page.url,
+            title=page.title(),
+            length=len(text),
+            truncated=len(text) > limit,
+            text=text[:limit],
+        )
+    except Exception as exc:
+        return jsonify(error=str(exc)), 500
+
+
+@app.route("/api/browser/screenshot", methods=["GET"])
+def api_browser_screenshot():
+    """
+    Read-only: save a full-page PNG of the live window and return its path —
+    to check what a filled form actually shows before the human submits it.
+    """
+    try:
+        page = get_driver().get_page()
+        out  = config.DATA_DIR / "screenshots"
+        out.mkdir(parents=True, exist_ok=True)
+        path = out / f"page_{int(time.time())}.png"
+        page.screenshot(path=str(path), full_page=request.args.get("full", "1") == "1")
+        return jsonify(ok=True, url=page.url, path=str(path))
+    except Exception as exc:
+        return jsonify(error=str(exc)), 500
+
+
 @app.route("/api/browser/save_cookies", methods=["POST"])
 def api_browser_save_cookies():
     """Persist current browser cookies to disk (call after manual login)."""
@@ -378,14 +505,16 @@ def credentials_delete():
 @app.route("/api/browser/login", methods=["POST"])
 def api_browser_login():
     """Navigate to a site and auto-fill saved credentials."""
-    data = request.json or {}
-    url  = data.get("url", "").strip()
+    data     = request.json or {}
+    url      = data.get("url", "").strip()
+    username = data.get("username", "").strip() or None
     if not url:
         return jsonify(error="url required"), 400
     try:
         page   = get_driver().get_page()
-        result = cred_store.auto_login(page, url)
-        status = 200 if result.get("ok") else (404 if "No saved" in result.get("error","") else 500)
+        result = cred_store.auto_login(page, url, username)
+        status = 200 if result.get("ok") else (404 if "No credential" in result.get("error","")
+                                              or "No saved" in result.get("error","") else 500)
         return jsonify(result), status
     except Exception as exc:
         return jsonify(error=str(exc)), 500
@@ -394,13 +523,14 @@ def api_browser_login():
 @app.route("/api/browser/google_login", methods=["POST"])
 def api_browser_google_login():
     """Log into a site using Google SSO ('Continue with Google' button)."""
-    data = request.json or {}
-    url  = data.get("url", "").strip()
+    data     = request.json or {}
+    url      = data.get("url", "").strip()
+    username = data.get("username", "").strip() or None
     if not url:
         return jsonify(error="url required"), 400
     try:
         page   = get_driver().get_page()
-        result = cred_store.google_sso_login(page, url)
+        result = cred_store.google_sso_login(page, url, username)
         status = 200 if result.get("ok") else (400 if result.get("code") in ("unsupported", "no_sso_button") else 500)
         return jsonify(result), status
     except Exception as exc:
