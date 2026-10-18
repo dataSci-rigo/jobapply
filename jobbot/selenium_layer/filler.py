@@ -51,11 +51,11 @@ class FieldFiller:
         el.click(click_count=3, timeout=self.timeout)
         el.type(value, delay=30)   # delay=30ms mimics human typing pace
 
-        # Trigger React/Vue synthetic change event
-        self.page.evaluate(
-            """([sel, val]) => {
-                const el = document.querySelector(sel);
-                if (!el) return;
+        # Trigger React/Vue synthetic change event. Run it on the element _find()
+        # already located: re-querying with document.querySelector broke on
+        # Playwright-only selectors (:has-text, text=) and on fields in iframes.
+        el.evaluate(
+            """(el, val) => {
                 const setter = Object.getOwnPropertyDescriptor(
                     el.tagName === 'TEXTAREA'
                         ? HTMLTextAreaElement.prototype
@@ -66,7 +66,7 @@ class FieldFiller:
                 el.dispatchEvent(new Event('input',  {bubbles: true}));
                 el.dispatchEvent(new Event('change', {bubbles: true}));
             }""",
-            [selector, value],
+            value,
         )
 
     def _fill_select(self, el, selector: str, value: str) -> None:

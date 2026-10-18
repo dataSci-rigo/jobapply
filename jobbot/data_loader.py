@@ -89,7 +89,21 @@ def load_all() -> dict:
     _cache["resume"] = resume or {}
     _cache["prefs"]  = prefs  or {}
     _cache["star"]   = star   or []
+    # Optional: the capability inventory from the Profile page. Missing = empty.
+    caps_path = getattr(config, "CAPABILITIES_PATH", None)
+    caps = _load(caps_path, "capabilities.json") if caps_path and caps_path.exists() else None
+    _cache["capabilities"] = (caps or {}).get("entries", [])
     return _cache
+
+
+def reset_cache() -> None:
+    """Drop cached sources so the next load_all() rereads the files (after an edit)."""
+    _cache.clear()
+    _missing.clear()
+
+
+def get_capabilities() -> list:
+    return load_all().get("capabilities", [])
 
 
 def is_ready() -> tuple[bool, list[str]]:

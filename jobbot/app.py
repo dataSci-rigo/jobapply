@@ -15,6 +15,7 @@ from flask import Flask, jsonify, redirect, render_template, request, session, u
 sys.path.insert(0, str(Path(__file__).parent))
 
 import config
+import capabilities
 import credentials as cred_store
 import data_loader
 from db import store
@@ -24,7 +25,7 @@ from matching.question_match import (
     normalize_company_name,
 )
 from generation.answers import generate_answer
-from generation.resume_tailor import tailor_resume
+from generation.resume_tailor import tailor_resume_with_report
 from generation.cover_letter import generate_cover_letter
 from resume.render import render_pdf
 
@@ -148,8 +149,8 @@ def api_generate_resume():
 
     jd_text = application["jd_text"] or ""
     try:
-        tailored = tailor_resume(jd_text)
-    except ValueError as exc:
+        tailored, report = tailor_resume_with_report(jd_text)
+    except (ValueError, RuntimeError) as exc:
         return jsonify(error=str(exc)), 500
 
     company_name = application["company_name"]
@@ -164,6 +165,7 @@ def api_generate_resume():
         resume_version_id=rv_id,
         pdf_path=str(pdf_path),
         resume_json=tailored,
+        check_report=report,
     )
 
 
@@ -431,7 +433,7 @@ def api_browser_screenshot():
         page = get_driver().get_page()
         out  = config.DATA_DIR / "screenshots"
         out.mkdir(parents=True, exist_ok=True)
-        path = out / f"page_{int(time.time())}.png"
+        path = out / f"page_{time.time_ns()}.png"   # ns: instances share this dir
         page.screenshot(path=str(path), full_page=request.args.get("full", "1") == "1")
         return jsonify(ok=True, url=page.url, path=str(path))
     except Exception as exc:
@@ -445,6 +447,80 @@ def api_browser_save_cookies():
         count = get_driver().save_cookies()
         return jsonify(ok=True, count=count)
     except Exception as exc:
+        return jsonify(error=str(exc)), 500
+
+
+# ── Profile intake (capability inventory) ─────────────────────────────────────
+
+def _target_jd_texts() -> list[str]:
+    """Job descriptions of every application he has started — what gap questions mine."""
+    return [a["jd_text"] for a in store.list_applications(limit=500) if a["jd_text"]]
+
+
+@app.route("/profile", methods=["GET"])
+def profile():
+    entries = capabilities.load()
+    gaps, pending = capabilities.gap_questions(_target_jd_texts(), entries)
+    return render_template("profile.html", entries=entries, gaps=gaps, pending=pending,
+                           proposed=capabilities.load_proposed(),
+                           questions=capabilities.load_questions(),
+                           levels=capabilities.LEVELS, categories=capabilities.CATEGORIES)
+
+
+@app.route("/api/profile/proposed/confirm", methods=["POST"])
+def api_profile_proposed_confirm():
+    data = request.json or {}
+    try:
+        return jsonify(entry=capabilities.confirm_proposed(data.get("id", ""), data.get("entry") or {}))
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+
+
+@app.route("/api/profile/question/dismiss", methods=["POST"])
+def api_profile_question_dismiss():
+    capabilities.dismiss_question((request.json or {}).get("id", ""))
+    return jsonify(ok=True)
+
+
+@app.route("/api/profile/proposed/drop", methods=["POST"])
+def api_profile_proposed_drop():
+    capabilities.drop_proposed((request.json or {}).get("id", ""))
+    return jsonify(ok=True)
+
+
+@app.route("/api/profile/refresh_gaps", methods=["POST"])
+def api_profile_refresh_gaps():
+    """Analyze target postings not yet read (one model call each; cached afterwards)."""
+    try:
+        gaps, pending = capabilities.gap_questions(_target_jd_texts(), capabilities.load(),
+                                                   refresh_missing=True)
+        return jsonify(questions=len(gaps), pending=pending)
+    except (ValueError, RuntimeError) as exc:
+        return jsonify(error=str(exc)), 500
+
+
+@app.route("/api/profile/entry", methods=["POST"])
+def api_profile_entry():
+    try:
+        return jsonify(entry=capabilities.upsert(request.json or {}))
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+
+
+@app.route("/api/profile/delete", methods=["POST"])
+def api_profile_delete():
+    return jsonify(ok=capabilities.delete((request.json or {}).get("id", "")))
+
+
+@app.route("/api/profile/structure", methods=["POST"])
+def api_profile_structure():
+    """Free-form notes -> proposed entries + follow-up questions (nothing saved)."""
+    notes = ((request.json or {}).get("notes") or "").strip()
+    if not notes:
+        return jsonify(error="notes required"), 400
+    try:
+        return jsonify(capabilities.structure_notes(notes))
+    except (ValueError, RuntimeError) as exc:
         return jsonify(error=str(exc)), 500
 
 

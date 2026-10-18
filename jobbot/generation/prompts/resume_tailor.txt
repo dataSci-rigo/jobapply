@@ -1,12 +1,14 @@
-Produce a tailored resume JSON for the job description below.
+Write a tailored resume for the job below, as JSON matching the response schema.
 
-Rules:
-1. SELECT bullets and skills from the master resume that are most relevant to this JD.
-2. You may REORDER and lightly REPHRASE bullets to better match the JD's language — do NOT fabricate any experience.
-3. Keep the JSON structure identical to the master resume (same keys). Only the content of bullets/skills/summary may change.
-4. Aim for the top 3-5 bullets per role (fewer is fine if fewer are relevant). Remove roles that add no signal for this JD.
-5. In the summary field, write 2-3 sentences that position the candidate for this specific role.
-6. Output ONLY valid JSON — no markdown fences, no commentary.
+Code fills the header and copies company, title, location and dates from the master resume, so write only the content: summary, bullets, projects, skills and degrees.
+
+1. Experience. Put every role that ended in or after {cutoff_year} in `experience`, in the master's order. Choose and order each role's bullets by relevance to this job: 3-5 for strong matches, 1-2 for weak ones. You may tighten, merge and reword bullets and lead with the result, but keep every fact as the master states it.
+2. Earlier experience. Roles that ended before {cutoff_year} go in `earlier_experience`, and only when they carry evidence this job wants (tools, systems, production or customer work). They render without dates; use one or two bullets each.
+3. Summary. Three or four sentences, no pronouns (resume voice: "Engineer who builds…", never "He…" or "I…"). Answer "can he do this job?" first, using the job's language where his history supports it, then the strongest proof (results, scale, credentials). If the resume lists a second spoken language, mention it when the job involves teams, customers or a manufacturing floor. When stating experience, say "15+ years", never the exact count.
+4. Projects. They render under a "Personal Projects" heading, so don't label the names. Include personal projects that show what this job needs (for example, building with LLM APIs, integrations, automation); keep each description factual and one sentence.
+5. Skills. Only skills in the master skills list or named in its bullets and projects, ordered by relevance to this job; drop irrelevant ones.
+6. Education. List every degree (institution and degree name).
+7. Length: two rendered pages at most (about 800 words) — code checks this. Keep the skills list to what this job uses. No pronouns, no GPAs, no dates in the text.
 
 JOB DESCRIPTION:
 {jd_text}

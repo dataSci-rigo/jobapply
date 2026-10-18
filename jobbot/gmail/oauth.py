@@ -19,8 +19,8 @@ _SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 _LAST_SYNC: Optional[str] = None
 
 _ACCOUNTS = {
-    "personal":  config.GMAIL_TOKEN_PERSONAL,   # rluna727@gmail.com
-    "berkeley":  config.GMAIL_TOKEN_BERKELEY,    # rlunaorozco@berkeley.edu
+    "personal":  config.GMAIL_TOKEN_PERSONAL,   # GOOGLE_EMAIL
+    "berkeley":  config.GMAIL_TOKEN_BERKELEY,    # GMAIL_BERKELEY_EMAIL
 }
 
 # Cached Credentials per account — avoids re-reading the token file and

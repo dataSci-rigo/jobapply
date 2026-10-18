@@ -1,4 +1,4 @@
-Answer the following application question using ONLY the candidate's real background.
+Answer this application question for the candidate.
 
 QUESTION: {question}
 FIELD TYPE: {field_type}
@@ -8,11 +8,9 @@ JOB DESCRIPTION CONTEXT:
 
 {reference_block}
 
-Instructions:
-- Answer directly and concisely. Do not pad to hit the character limit.
-- Stay strictly within {char_limit} characters.
-- Use first person ("I").
-- If this is a yes/no or select field, output only the exact option value.
-- Do not mention the job description explicitly unless it is natural to do so.
-- Draw from the STAR stories and work history for behavioral questions.
-- Output only the answer text — no preamble, no explanation.
+- Answer the question directly, then back it with his strongest relevant proof: a result, number or concrete example from the sources.
+- Use the job's own vocabulary where his history supports it.
+- For behavioral questions, draw on the STAR stories, keeping only details the master resume also states.
+- For yes/no or select fields, output only the exact option value. For standing facts (authorization, location, salary, start date), use preferences.json; if a number is required and preferences give none, answer with "competitive / market rate".
+- First person, stay within {char_limit} characters, and don't pad to fill them.
+- Output only the answer text.

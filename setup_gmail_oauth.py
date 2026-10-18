@@ -3,8 +3,8 @@
 One-time Gmail OAuth setup for apply2jobs.
 
 Authorises two Google accounts for Gmail readonly access:
-  1. rluna727@gmail.com   → data/gmail_token_personal.json
-  2. rlunaorozco@berkeley.edu → data/gmail_token_berkeley.json
+  1. personal account (GOOGLE_EMAIL in .env)        → data/gmail_token_personal.json
+  2. Berkeley account (GMAIL_BERKELEY_EMAIL in .env) → data/gmail_token_berkeley.json
 
 Reads GOOGLE_CLIENT_SECRET from .env for the OAuth client credentials.
 
@@ -30,9 +30,10 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
 ]
 
+# (label, .env key holding the address, token file) — addresses live in .env only
 ACCOUNTS = [
-    ("personal",  "rluna727@gmail.com",          "gmail_token_personal.json"),
-    ("berkeley",  "rlunaorozco@berkeley.edu",     "gmail_token_berkeley.json"),
+    ("personal",  "GOOGLE_EMAIL",          "gmail_token_personal.json"),
+    ("berkeley",  "GMAIL_BERKELEY_EMAIL",  "gmail_token_berkeley.json"),
 ]
 
 
@@ -95,7 +96,12 @@ def main() -> None:
     print("[setup] Berkeley may require CalNet + DUO before reaching the consent screen.\n")
 
     results = {}
-    for label, email, token_filename in ACCOUNTS:
+    for label, env_key, token_filename in ACCOUNTS:
+        email = env.get(env_key, "").strip("'\"")
+        if not email:
+            print(f"[{label}] {env_key} is not set in .env — skipping.")
+            results[label] = False
+            continue
         token_path = PROJECT_DATA / token_filename
         if token_path.exists():
             print(f"[{label}] Token already exists — skipping. Delete {token_path} to re-auth.")

@@ -40,7 +40,9 @@ def generate_answer(
     answer = generate_with_references(
         prompt,
         reference_answers=reference_answers or [],
-        max_tokens=min(effective_limit // 2 + 200, 2048),
+        # Opus 5.5 always thinks, and thinking counts toward max_tokens; the
+        # character limit is enforced on the text below, not through this cap.
+        max_tokens=16000,
     )
 
     # Hard-trim to char limit as a safety net

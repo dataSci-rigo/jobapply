@@ -1,0 +1,15 @@
+Review this tailored resume twice over — as a skeptical hiring manager for the job below, and as a fact-checker against the candidate's source material above.
+
+1. violations: every claim the sources don't support. That covers invented or inflated experience, tools, scope, metrics or ownership ("led" where the source says "reviewed"; a personal project presented as employer work); job-description keywords his history doesn't show; and wording that implies more than the source states. For each, give where it is; `claim` — the offending words copied exactly from the resume (verbatim, as short as is still unique); why it fails; and `fix` — only the text that replaces the claim (no "Replace with", no quotes; it must read correctly in place), or exactly "delete". Faithful rewording, tightening and reordering are not violations.
+2. missed: specific facts in the sources that would make him a stronger candidate for this job but are missing or buried — a relevant tool, metric, role, project or language. For each, give the source fact and where it belongs.
+
+Your fixes must follow the resume's presentation rules: no pronouns ("he", "I"); experience stated as "15+ years", never the exact count; personal projects sit under a "Personal Projects" heading; two pages at most, so don't ask for additions without naming what they replace.
+
+AUTOMATED CHECK FINDINGS (code-run; they will be fixed in revision — note any that are false positives):
+{auto_findings}
+
+JOB DESCRIPTION:
+{jd_text}
+
+TAILORED RESUME:
+{resume_json}

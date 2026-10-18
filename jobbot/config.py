@@ -41,13 +41,22 @@ def _load_env_files() -> None:
 _load_env_files()
 
 # Anthropic models — pin from docs.claude.com
-GENERATION_MODEL = "claude-sonnet-4-6"   # resume / cover letter / answers
+GENERATION_MODEL = "claude-opus-5-5"     # resume / cover letter / answers
+REVIEW_MODEL     = "claude-opus-5-5"     # fact-checks every tailored resume against the sources
 MATCHING_MODEL   = "claude-haiku-4-5-20251001"    # cheap normalization tasks
+
+# Opus 5.5 defaults to "medium" effort; tailoring and fact-checking are worth more.
+GENERATION_EFFORT = "high"
+REVIEW_EFFORT     = "high"
+MAX_REVISIONS     = 2      # fact-check -> revise rounds before giving up and reporting
 
 # Input data files
 MASTER_RESUME_PATH = DATA_DIR / "master_resume.json"
 PREFERENCES_PATH   = DATA_DIR / "preferences.json"
 STAR_PATH          = DATA_DIR / "star.json"
+CAPABILITIES_PATH  = DATA_DIR / "capabilities.json"   # optional: Profile-page intake
+JD_REQUIREMENTS_PATH = DATA_DIR / "jd_requirements.json"  # cache: requirements extracted per posting
+PROPOSED_CAPABILITIES_PATH = DATA_DIR / "capabilities_proposed.json"  # awaiting his confirmation
 
 # PDF output directory
 PDF_DIR = DATA_DIR / "pdfs"
@@ -84,6 +93,6 @@ SCRAPE_HOUR           = int(os.getenv("SCRAPE_HOUR", "8"))   # daily scrape hour
 
 # ── Gmail OAuth ────────────────────────────────────────────────────────────────
 GMAIL_CREDENTIALS_PATH   = DATA_DIR / "gmail_credentials.json"
-GMAIL_TOKEN_PERSONAL     = DATA_DIR / "gmail_token_personal.json"   # rluna727@gmail.com
-GMAIL_TOKEN_BERKELEY     = DATA_DIR / "gmail_token_berkeley.json"   # rlunaorozco@berkeley.edu
+GMAIL_TOKEN_PERSONAL     = DATA_DIR / "gmail_token_personal.json"   # GOOGLE_EMAIL
+GMAIL_TOKEN_BERKELEY     = DATA_DIR / "gmail_token_berkeley.json"   # GMAIL_BERKELEY_EMAIL
 GMAIL_SYNC_DAYS          = int(os.getenv("GMAIL_SYNC_DAYS", "14"))

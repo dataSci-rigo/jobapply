@@ -284,7 +284,10 @@ def main() -> None:
         sys.exit(1)
 
     env = _read_env(ENV_FILE)
-    email = env.get("GOOGLE_EMAIL", "rluna727@gmail.com")
+    email = env.get("GOOGLE_EMAIL", "")
+    if not email:
+        print("ERROR: set GOOGLE_EMAIL in the master .env (the account to sign up with).")
+        sys.exit(1)
 
     from patchright.sync_api import sync_playwright
 

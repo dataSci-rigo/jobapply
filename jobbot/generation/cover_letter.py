@@ -19,4 +19,4 @@ def generate_cover_letter(
         job_title=job_title,
         jd_text=jd_text[:6000],
     )
-    return generate(prompt, max_tokens=1024)
+    return generate(prompt, max_tokens=16000)   # room for thinking + the letter

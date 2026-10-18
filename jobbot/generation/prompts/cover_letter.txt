@@ -3,13 +3,11 @@ Write a cover letter for this job application.
 Company: {company_name}
 Role: {job_title}
 
-Instructions:
-- Three to four paragraphs, under 400 words total.
-- Opening: state the role and a sharp, specific reason this candidate is a strong fit (not generic enthusiasm).
-- Middle (1-2 paragraphs): 2-3 concrete examples from work history or STAR stories that directly address the JD's key requirements. Quantify wherever possible.
-- Closing: confident, forward-looking. No "I look forward to hearing from you"-style filler — end with the value the candidate brings.
-- Formal but not stiff. No bullet points.
-- Output only the letter body — no date, no address header, no "Sincerely" block.
+- Three or four paragraphs, under 350 words; start with "Dear {company_name} Hiring Team," and end without a signature block.
+- Opening: the role, and a sharp, specific reason he can do it, in the job's own terms.
+- Middle: two or three concrete, quantified examples from his history that map to what this job needs most. Include older or personal-project evidence when it's the best proof.
+- Closing: what he would deliver in this role. No "I look forward to hearing from you" filler.
+- Formal but not stiff; no bullet points.
 
 JOB DESCRIPTION:
 {jd_text}

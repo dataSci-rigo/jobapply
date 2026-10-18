@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+{% block title %}Profile — JobBot{% endblock %}
+{% block content %}
+<h1>Profile</h1>
+<p class="lead">Everything you can do that your resume doesn't say. Each item gets an honest level, and the
+generator uses it accordingly: <b>done at work</b> and <b>personal project</b> items can go on a resume,
+<b>familiar</b> items only in a skills list, and <b>can learn fast</b> items never appear as experience —
+cover letters and answers can say "haven't used X yet; did Y" using the proof you give.</p>
+
+<!-- 1. Gap questions -->
+<section class="card">
+  <h2>Quick questions from your target jobs <span class="at">({{ gaps|length }})</span></h2>
+  <p class="hint">What the postings you've started ask for that your resume and this profile don't fully
+  cover — required first, then by how many postings ask. Answer what you can; skip the rest.</p>
+  {% if pending %}
+  <p class="hint"><b>{{ pending }}</b> posting{{ "s" if pending != 1 }} not analyzed yet.
+    <button id="refresh-gaps">Analyze them</button> <span id="refresh-msg" class="msg"></span></p>
+  {% endif %}
+  {% for g in gaps %}
+  <div class="gap" data-term="{{ g.term }}" data-kind="{{ g.kind }}">
+    <div class="gap-head"><b>{{ g.term }}</b>
+      <span class="badge {{ 'badge-required' if g.required else 'badge-none' }}">{{ "required" if g.required else "preferred" }}</span>
+      <span class="at">{{ g.postings }} posting{{ "s" if g.postings != 1 }}{% if g.covered == "partly" %} · your resume shows something close{% endif %}</span></div>
+    <div class="field-meta">“{{ g.snippet }}”</div>
+    <div class="levels">
+      <button data-level="professional">Done at work</button>
+      <button data-level="project">Personal project</button>
+      <button data-level="familiar">Familiar</button>
+      <button data-level="learnable">Can learn fast</button>
+      <button data-level="none">No</button>
+      <button data-level="skip" class="quiet">Skip</button>
+    </div>
+    <div class="gap-detail" hidden>
+      <div class="row-inline">
+        <input type="text" class="where" placeholder="Where (employer or project)" style="flex:1">
+        <input type="text" class="when" placeholder="When (years)" style="width:130px">
+      </div>
+      <textarea class="evidence" rows="2" placeholder="What you did with it — specifics, scale, result"></textarea>
+      <textarea class="adjacent" rows="2" placeholder="Closest thing you HAVE done (required for 'Can learn fast')" hidden></textarea>
+      <button class="btn-primary save-gap">Save</button> <span class="msg"></span>
+    </div>
+  </div>
+  {% else %}
+  <p class="hint">No open questions — your profile covers every term in your target postings.</p>
+  {% endfor %}
+</section>
+
+<!-- 1b. Proposed from notes -->
+{% if proposed %}
+<section class="card">
+  <h2>Proposed from your notes — confirm or drop <span class="at">({{ proposed|length }})</span></h2>
+  <p class="hint">Drafted from your project notes, grouped by note. Check each level and its wording; edit a
+  card before confirming if needed. Nothing joins your profile until you confirm it.</p>
+  <div id="proposed-from-notes"></div>
+</section>
+{% endif %}
+
+<!-- 1c. Follow-up questions -->
+{% if questions %}
+<section class="card">
+  <h2>Questions that would strengthen your profile <span class="at">({{ questions|length }})</span></h2>
+  <p class="hint">Asked while reading your notes. Answer any of them in "Tell me more" below (paste the
+  question with your answer), then dismiss it here.</p>
+  {% for q in questions %}
+  <div class="question" data-id="{{ q.id }}">
+    <span class="at">{{ q.source|replace("notes: ", "") }}</span>
+    <div>{{ q.question }} <button class="quiet q-use">Answer ↓</button> <button class="quiet q-dismiss">Dismiss</button></div>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+
+<!-- 2. Free-form notes -->
+<section class="card">
+  <h2>Tell me more</h2>
+  <p class="hint">Type or paste anything: tools and systems you've used, things you built or fixed, what
+  you're learning now (take-home projects count), and what you could pick up quickly and why. Nothing is
+  saved until you confirm each item.</p>
+  <textarea id="notes" rows="8" placeholder="e.g. At my last job I configured the ERP job routings for a production line and pulled SCADA alarm data into weekly Excel reports…"></textarea>
+  <button id="structure" class="btn-primary">Turn into profile items →</button> <span id="structure-msg" class="msg"></span>
+  <div id="followups"></div>
+  <div id="proposed"></div>
+</section>
+
+<!-- 3. Inventory -->
+<section class="card">
+  <h2>Your profile <span class="at">({{ entries|length }} items)</span></h2>
+  <table class="answers-table">
+    <tr><th>Item</th><th>Level</th><th>Where / when</th><th>Evidence</th><th></th></tr>
+    {% for e in entries|sort(attribute="level") %}
+    <tr data-id="{{ e.id }}">
+      <td><b>{{ e.name }}</b><div class="at">{{ e.category }}</div></td>
+      <td><span class="badge badge-{{ e.level }}">{{ e.level }}</span></td>
+      <td>{{ e.where }}{% if e.when %} · {{ e.when }}{% endif %}</td>
+      <td>{{ e.evidence }}{% if e.adjacent %}<div class="at">closest: {{ e.adjacent }}</div>{% endif %}</td>
+      <td><button class="quiet del">Delete</button></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" class="hint">Nothing yet.</td></tr>
+    {% endfor %}
+  </table>
+</section>
+
+<template id="proposed-tpl">
+  <div class="field-card proposed">
+    <div class="row-inline">
+      <input type="text" class="p-name" style="flex:1">
+      <select class="p-level">{% for l in levels %}<option value="{{ l }}">{{ l }}</option>{% endfor %}</select>
+      <select class="p-category">{% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select>
+    </div>
+    <div class="row-inline">
+      <input type="text" class="p-where" placeholder="Where" style="flex:1">
+      <input type="text" class="p-when" placeholder="When" style="width:130px">
+    </div>
+    <textarea class="p-evidence" rows="2" placeholder="Evidence"></textarea>
+    <textarea class="p-adjacent" rows="2" placeholder="Closest experience (for 'learnable')"></textarea>
+    <button class="btn-primary p-save">Save</button> <button class="quiet p-drop">Drop</button>
+    <span class="msg"></span>
+  </div>
+</template>
+
+<style>
+  .lead, .hint { font-size: 13px; color: #555; margin-bottom: 12px; }
+  .gap { border-top: 1px solid #eef0f3; padding: 10px 0; }
+  .gap-head { display: flex; gap: 8px; align-items: baseline; }
+  .levels { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  .levels button.on { background: #2563eb; color: #fff; }
+  button.quiet { background: transparent; color: #6b7280; }
+  .gap-detail textarea, .proposed textarea { margin: 6px 0; }
+  .badge-professional { background: #d1fae5; color: #065f46; }
+  .badge-project      { background: #dbeafe; color: #1d4ed8; }
+  .badge-familiar     { background: #fef3c7; color: #92400e; }
+  .badge-learnable    { background: #ede9fe; color: #5b21b6; }
+  .badge-none         { background: #f3f4f6; color: #6b7280; }
+  .badge-required     { background: #fee2e2; color: #991b1b; }
+  #followups ul { margin: 10px 0 0 18px; font-size: 13px; }
+  details.group { border-top: 1px solid #eef0f3; padding: 8px 0; }
+  details.group summary { cursor: pointer; display: flex; gap: 8px; align-items: center; }
+  .question { border-top: 1px solid #eef0f3; padding: 8px 0; font-size: 13px; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 1. Gap questions: pick a level, add detail, save. "No" saves immediately; "Skip" hides the row.
+document.querySelectorAll('.gap').forEach(row => {
+  const detail = row.querySelector('.gap-detail');
+  let level = null;
+  row.querySelectorAll('.levels button').forEach(btn => btn.addEventListener('click', async () => {
+    level = btn.dataset.level;
+    row.querySelectorAll('.levels button').forEach(b => b.classList.toggle('on', b === btn));
+    if (level === 'skip') { row.remove(); return; }
+    if (level === 'none') { await saveGap(row, level); return; }
+    detail.hidden = false;
+    row.querySelector('.adjacent').hidden = level !== 'learnable';
+  }));
+  row.querySelector('.save-gap').addEventListener('click', () => saveGap(row, level));
+});
+
+async function saveGap(row, level) {
+  const r = await post('/api/profile/entry', {
+    name: row.dataset.term, level,
+    category: ({credential: 'certification'})[row.dataset.kind] || row.dataset.kind || 'tool',
+    where: row.querySelector('.where').value, when: row.querySelector('.when').value,
+    evidence: row.querySelector('.evidence').value, adjacent: row.querySelector('.adjacent').value,
+  });
+  const msg = row.querySelector('.msg');
+  if (r.error) { show(msg, r.error, true); return; }
+  row.style.opacity = 0.45;
+  show(msg, 'Saved', false);
+}
+
+const refresh = document.getElementById('refresh-gaps');
+if (refresh) refresh.addEventListener('click', async () => {
+  refresh.disabled = true;
+  show(document.getElementById('refresh-msg'), 'Reading the postings… (about 20 seconds each)', false);
+  const r = await post('/api/profile/refresh_gaps', {});
+  if (r.error) { show(document.getElementById('refresh-msg'), r.error, true); refresh.disabled = false; return; }
+  location.reload();
+});
+
+// 2. Free-form notes -> proposed entries to confirm one by one.
+document.getElementById('structure').addEventListener('click', async () => {
+  const btn = document.getElementById('structure'), msg = document.getElementById('structure-msg');
+  const notes = document.getElementById('notes').value.trim();
+  if (!notes) return;
+  btn.disabled = true; show(msg, 'Reading your notes… (about a minute)', false);
+  const r = await post('/api/profile/structure', {notes});
+  btn.disabled = false;
+  if (r.error) { show(msg, r.error, true); return; }
+  show(msg, `${r.entries.length} item(s) to confirm below`, false);
+  const box = document.getElementById('proposed'); box.innerHTML = '';
+  r.entries.forEach(e => box.appendChild(proposedCard(e)));
+  const fu = document.getElementById('followups');
+  fu.innerHTML = r.follow_up_questions.length
+    ? '<p class="hint" style="margin-top:12px">To make these stronger, answer in the box above and run it again:</p><ul>'
+      + r.follow_up_questions.map(q => `<li>${q.replace(/</g, '&lt;')}</li>`).join('') + '</ul>'
+    : '';
+});
+
+function proposedCard(e, saveFn) {
+  const node = document.getElementById('proposed-tpl').content.firstElementChild.cloneNode(true);
+  const set = (cls, v) => node.querySelector(cls).value = v || '';
+  set('.p-name', e.name); set('.p-level', e.level); set('.p-category', e.category);
+  set('.p-where', e.where); set('.p-when', e.when); set('.p-evidence', e.evidence); set('.p-adjacent', e.adjacent);
+  node.querySelector('.p-drop').addEventListener('click', () => node.remove());
+  node.querySelector('.p-save').addEventListener('click', async () => {
+    const get = cls => node.querySelector(cls).value;
+    const entry = {
+      name: get('.p-name'), level: get('.p-level'), category: get('.p-category'), where: get('.p-where'),
+      when: get('.p-when'), evidence: get('.p-evidence'), adjacent: get('.p-adjacent'),
+    };
+    const r = saveFn ? await saveFn(entry, node) : await post('/api/profile/entry', entry);
+    const msg = node.querySelector('.msg');
+    if (r.error) { show(msg, r.error, true); return; }
+    node.style.opacity = 0.45; show(msg, 'Saved', false);
+  });
+  return node;
+}
+
+// 1b. Proposals from notes, grouped by source note; each card editable, plus bulk confirm/drop.
+const PROPOSED = {{ proposed|tojson }};
+const fromNotes = document.getElementById('proposed-from-notes');
+const readCard = node => {
+  const get = cls => node.querySelector(cls).value;
+  return {name: get('.p-name'), level: get('.p-level'), category: get('.p-category'), where: get('.p-where'),
+          when: get('.p-when'), evidence: get('.p-evidence'), adjacent: get('.p-adjacent')};
+};
+async function confirmCard(card, id) {
+  const r = await post('/api/profile/proposed/confirm', {id, entry: readCard(card)});
+  const msg = card.querySelector('.msg');
+  if (r.error) { show(msg, r.error, true); return false; }
+  card.remove(); return true;
+}
+if (fromNotes) {
+  const groups = {};
+  PROPOSED.forEach(e => (groups[e.source || 'notes'] ||= []).push(e));
+  Object.entries(groups).forEach(([source, items]) => {
+    const box = document.createElement('details'); box.className = 'group';
+    box.innerHTML = `<summary><b></b> <span class="at"></span>
+      <button class="g-confirm">Confirm all</button> <button class="quiet g-drop">Drop all</button></summary>`;
+    box.querySelector('b').textContent = source.replace('notes: ', '');
+    box.querySelector('.at').textContent = `${items.length} item(s)`;
+    items.forEach(e => {
+      const card = proposedCard(e, null);
+      card.dataset.id = e.id;
+      const save = card.querySelector('.p-save'), drop = card.querySelector('.p-drop');
+      save.replaceWith(save.cloneNode(true)); drop.replaceWith(drop.cloneNode(true));
+      card.querySelector('.p-save').textContent = 'Confirm';
+      card.querySelector('.p-save').addEventListener('click', () => confirmCard(card, e.id));
+      card.querySelector('.p-drop').addEventListener('click', async () => {
+        await post('/api/profile/proposed/drop', {id: e.id}); card.remove();
+      });
+      box.appendChild(card);
+    });
+    box.querySelector('.g-confirm').addEventListener('click', async ev => {
+      ev.preventDefault();
+      for (const card of [...box.querySelectorAll('.proposed')]) await confirmCard(card, card.dataset.id);
+      if (!box.querySelector('.proposed')) box.remove();
+    });
+    box.querySelector('.g-drop').addEventListener('click', async ev => {
+      ev.preventDefault();
+      if (!confirm('Drop every proposal from this note?')) return;
+      for (const card of [...box.querySelectorAll('.proposed')]) {
+        await post('/api/profile/proposed/drop', {id: card.dataset.id}); card.remove();
+      }
+      box.remove();
+    });
+    fromNotes.appendChild(box);
+  });
+}
+
+// 1c. Follow-up questions: copy into the notes box, or dismiss.
+document.querySelectorAll('.question').forEach(q => {
+  q.querySelector('.q-use').addEventListener('click', () => {
+    const notes = document.getElementById('notes');
+    notes.value += (notes.value ? '\n\n' : '') + 'Q: ' + q.querySelector('div').firstChild.textContent.trim() + '\nA: ';
+    notes.focus(); notes.scrollIntoView({behavior: 'smooth', block: 'center'});
+  });
+  q.querySelector('.q-dismiss').addEventListener('click', async () => {
+    await post('/api/profile/question/dismiss', {id: q.dataset.id}); q.remove();
+  });
+});
+
+// 3. Inventory: delete.
+document.querySelectorAll('.del').forEach(btn => btn.addEventListener('click', async () => {
+  const tr = btn.closest('tr');
+  if (!confirm('Delete this item?')) return;
+  await post('/api/profile/delete', {id: tr.dataset.id});
+  tr.remove();
+}));
+</script>
+{% endblock %}

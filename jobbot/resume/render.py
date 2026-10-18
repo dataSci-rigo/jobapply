@@ -32,3 +32,9 @@ def render_pdf(resume_dict: dict, label: str = "") -> Path:
 
     HTML(string=html_str, base_url=str(_TEMPLATE_DIR)).write_pdf(str(pdf_path))
     return pdf_path
+
+
+def count_pages(resume_dict: dict) -> int:
+    """Pages the resume renders to, without writing a file — for the two-page check."""
+    html_str = _env.get_template("template.html").render(r=resume_dict)
+    return len(HTML(string=html_str, base_url=str(_TEMPLATE_DIR)).render().pages)

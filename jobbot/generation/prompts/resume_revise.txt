@@ -1,0 +1,22 @@
+Revise this tailored resume for the job below and return it in the same JSON schema.
+
+- Fix every item in AUTOMATED (code-run checks: unsupported terms or numbers, length, presentation rules).
+- Apply every fix in VIOLATIONS exactly.
+- Work each item in MISSED into the place it names, dropping weaker content so the resume stays within two rendered pages.
+- Follow the presentation rules: no pronouns, "15+ years" when stating experience, no labels on project names.
+- Change nothing else.
+
+AUTOMATED:
+{automated}
+
+VIOLATIONS:
+{violations}
+
+MISSED:
+{missed}
+
+JOB DESCRIPTION:
+{jd_text}
+
+CURRENT RESUME:
+{resume_json}
