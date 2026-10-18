@@ -93,6 +93,10 @@ def load_all() -> dict:
     caps_path = getattr(config, "CAPABILITIES_PATH", None)
     caps = _load(caps_path, "capabilities.json") if caps_path and caps_path.exists() else None
     _cache["capabilities"] = (caps or {}).get("entries", [])
+    # Optional: what he told the intake interview he wants / would avoid.
+    iv_path = getattr(config, "INTERVIEW_PATH", None)
+    iv = _load(iv_path, "interview.json") if iv_path and iv_path.exists() else None
+    _cache["interests"] = [{"kind": i["kind"], "text": i["text"]} for i in (iv or {}).get("interests", [])]
     return _cache
 
 

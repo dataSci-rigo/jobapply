@@ -6,6 +6,7 @@ Capability-inventory intake from the command line (the Profile page does the sam
   python jobbot_intake.py --gaps --refresh       # ...analyzing postings not read yet (model calls)
   python jobbot_intake.py --propose-from a.md b.md   # model proposes entries from notes; you confirm on /profile
   python jobbot_intake.py --list                 # the inventory, by level
+  python jobbot_intake.py --interview            # adaptive interview in the terminal (same as /interview)
 
 Proposals never enter the inventory until confirmed on the Profile page.
 """
@@ -17,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import capabilities
+import interview
 from db import store
 
 _BATCH_CHARS = 18000
@@ -36,6 +38,28 @@ def _batches(paths: list[Path]):
         yield batch
 
 
+def _interview():
+    jds = [a["jd_text"] for a in store.list_applications(limit=500) if a["jd_text"]]
+    res = interview.step(None, jds)
+    while res["question"]:
+        q = res["question"]
+        print(f"\n{q['question']}" + (f"   [{q['why']}]" if q["why"] else ""))
+        if q["options"]:
+            print("   " + " | ".join(q["options"]))
+        try:
+            answer = input("> ").strip()
+        except EOFError:
+            answer = "q"
+        if answer.lower() in ("q", "quit", "exit"):
+            print("Stopped; the question stays open for next time.")
+            return
+        print("   …")
+        res = interview.step(answer, jds)
+        for s in res["saved"]:
+            print(f"   filed: {s['name']} ({s.get('level', '')})")
+    print("Nothing left on the agenda.")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--gaps", action="store_true", help="print open gap questions")
@@ -43,8 +67,10 @@ def main():
     ap.add_argument("--propose-from", nargs="+", type=Path, metavar="FILE",
                     help="notes files to turn into proposed entries")
     ap.add_argument("--list", action="store_true", help="print the inventory")
+    ap.add_argument("--interview", action="store_true",
+                    help="answer one question at a time; empty line = skip, 'q' = stop")
     args = ap.parse_args()
-    if not (args.gaps or args.propose_from or args.list):
+    if not (args.gaps or args.propose_from or args.list or args.interview):
         ap.print_help()
         return
 
@@ -66,6 +92,9 @@ def main():
             print(f"{names}: {added} proposed")
             for q in result["follow_up_questions"]:
                 print("   follow-up:", q)
+
+    if args.interview:
+        _interview()
 
     if args.list:
         for e in sorted(capabilities.load(), key=lambda e: (e["level"], e["name"].lower())):

@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import config
 import capabilities
+import interview
 import credentials as cred_store
 import data_loader
 from db import store
@@ -522,6 +523,38 @@ def api_profile_structure():
         return jsonify(capabilities.structure_notes(notes))
     except (ValueError, RuntimeError) as exc:
         return jsonify(error=str(exc)), 500
+
+
+# ── Intake interview (one adaptive question at a time) ─────────────────────────
+
+@app.route("/interview", methods=["GET"])
+def interview_page():
+    answered = [t for t in interview.load_turns() if t.get("answer") is not None]
+    return render_template("interview.html", history=answered[-30:][::-1],
+                           interests=interview.load_interests(), inventory=len(capabilities.load()),
+                           proposed=len(capabilities.load_proposed()))
+
+
+@app.route("/api/interview/step", methods=["POST"])
+def api_interview_step():
+    """Body {answer}: file the answer to the open question and get the next. No answer = start/resume."""
+    answer = (request.json or {}).get("answer")
+    try:
+        return jsonify(interview.step(answer, _target_jd_texts()))
+    except (ValueError, RuntimeError) as exc:
+        return jsonify(error=str(exc)), 500
+
+
+@app.route("/api/interview/undo", methods=["POST"])
+def api_interview_undo():
+    data = request.json or {}
+    return jsonify(ok=interview.undo(data.get("turn_id", ""), int(data.get("index", -1))))
+
+
+@app.route("/api/interview/interest/delete", methods=["POST"])
+def api_interview_interest_delete():
+    interview.delete_interest((request.json or {}).get("id", ""))
+    return jsonify(ok=True)
 
 
 # ── Outcomes ───────────────────────────────────────────────────────────────────

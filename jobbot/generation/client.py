@@ -53,13 +53,13 @@ def _cached_source_blocks() -> list[dict]:
             "cache_control": {"type": "ephemeral"},
         },
     ]
-    if data.get("capabilities"):
-        blocks.append({
-            "type": "text",
-            "text": "CAPABILITY INVENTORY (from his intake; each entry's level decides how it may be used):\n"
-                    + json.dumps(data["capabilities"], indent=2),
-            "cache_control": {"type": "ephemeral"},
-        })
+    if data.get("capabilities") or data.get("interests"):
+        text = ("CAPABILITY INVENTORY (from his intake; each entry's level decides how it may be used):\n"
+                + json.dumps(data.get("capabilities", []), indent=2))
+        if data.get("interests"):
+            text += ("\n\nSTATED INTERESTS (his words, from the intake interview — motivation and fit, "
+                     "never experience):\n" + json.dumps(data["interests"], indent=2))
+        blocks.append({"type": "text", "text": text, "cache_control": {"type": "ephemeral"}})
     return blocks
 
 

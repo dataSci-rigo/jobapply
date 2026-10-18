@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Interview — JobBot{% endblock %}
+{% block content %}
+<h1>Interview</h1>
+<p class="lead">One question at a time, picked from your last answer and the postings you're targeting.
+Answer in your own words, as short or long as you like. Everything it files goes straight into your
+<a href="{{ url_for('profile') }}">profile</a> at the level your words support; click × on anything it got wrong.
+<span class="at">Inventory: <span id="inv-count">{{ inventory }}</span> items · proposals still to check: {{ proposed }}</span></p>
+
+<section class="card" id="turn">
+  <div id="filed"></div>
+  <div id="question" class="iv-q">Loading…</div>
+  <div id="why" class="field-meta"></div>
+  <div id="options" class="iv-options"></div>
+  <textarea id="answer" rows="4" placeholder="Your answer (Ctrl+Enter to send)"></textarea>
+  <button class="btn-primary" id="send">Send</button>
+  <button id="skip">Skip</button>
+  <span id="status" class="msg"></span>
+</section>
+
+<section class="card">
+  <h2>What you want <span class="at">(from your answers — used to judge fit and in cover letters, never as experience)</span></h2>
+  <ul id="interests" class="iv-interests">
+    {% for i in interests %}
+    <li data-id="{{ i.id }}"><span class="badge badge-{{ i.kind }}">{{ i.kind }}</span> {{ i.text }} <a href="#" class="x">×</a></li>
+    {% else %}
+    <li class="hint empty">Nothing yet.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="card">
+  <h2>Earlier answers</h2>
+  <div id="history">
+    {% for t in history %}
+    <div class="iv-past" data-turn="{{ t.id }}">
+      <div><b>Q:</b> {{ t.question }}</div>
+      <div><b>A:</b> {{ t.answer }}</div>
+      <div class="chips">
+        {% for s in t.saved or [] %}
+        <span class="chip {{ 'undone' if s.undone }}" data-index="{{ loop.index0 }}" data-id="{{ s.id }}">{{ s.name }} <i>{{ s.level }}</i>{% if not s.undone %} <a href="#" class="x">×</a>{% endif %}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <p class="hint">None yet.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<style>
+  .lead, .hint { font-size: 13px; color: #555; margin-bottom: 12px; }
+  .iv-q { font-size: 17px; font-weight: 500; margin: 6px 0 4px; }
+  .iv-options button { background: #eef2ff; color: #1e3a8a; }
+  #answer { margin-top: 10px; }
+  .chips { margin: 4px 0; }
+  .chip { display: inline-block; background: #ecfdf5; color: #065f46; border-radius: 12px; padding: 2px 10px;
+          margin: 2px 4px 2px 0; font-size: 12px; }
+  .chip i { color: #6b7280; font-style: normal; }
+  .chip.undone { background: #f3f4f6; color: #9ca3af; text-decoration: line-through; }
+  .x { color: #9ca3af; text-decoration: none; margin-left: 4px; }
+  .x:hover { color: #dc2626; }
+  #filed .chips::before { content: "Filed: "; color: #6b7280; font-size: 12px; }
+  .iv-past { border-top: 1px solid #eee; padding: 8px 0; font-size: 13px; }
+  .iv-interests { list-style: none; }
+  .iv-interests li { margin: 4px 0; }
+  .badge-want { background: #d1fae5; color: #065f46; }
+  .badge-avoid { background: #fee2e2; color: #991b1b; }
+  .badge-curious { background: #e0e7ff; color: #3730a3; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const $ = id => document.getElementById(id);
+let busy = false;
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function chipsHtml(saved) {
+  return '<div class="chips">' + saved.map((s, i) =>
+    `<span class="chip" data-index="${i}" data-id="${esc(s.id)}">${esc(s.name)} <i>${esc(s.level || '')}</i> <a href="#" class="x">×</a></span>`
+  ).join('') + '</div>';
+}
+
+function render(res) {
+  if (res.saved && res.saved.length) {
+    $('filed').innerHTML = chipsHtml(res.saved);
+    $('filed').dataset.turn = res.answered_turn;
+    const inv = res.saved.filter(s => s.kind === 'entry').length;
+    $('inv-count').textContent = (+$('inv-count').textContent) + inv;
+    res.saved.filter(s => s.kind === 'interest').forEach(addInterest);
+  } else {
+    $('filed').innerHTML = '';
+  }
+  if (res.done || !res.question) {
+    $('question').textContent = 'That covers everything on the agenda for now. Start a new application and come back later — new postings bring new questions.';
+    $('why').textContent = ''; $('options').innerHTML = '';
+    return;
+  }
+  $('question').textContent = res.question.question;
+  $('why').textContent = res.question.why || '';
+  $('options').innerHTML = '';
+  (res.question.options || []).forEach(o => {
+    const b = document.createElement('button');
+    b.textContent = o;
+    b.title = 'Send this answer (or type more detail below and press Send)';
+    b.onclick = () => send($('answer').value.trim() ? o + ' — ' + $('answer').value.trim() : o);
+    $('options').appendChild(b);
+  });
+  $('answer').value = '';
+  $('answer').focus();
+}
+
+function addInterest(s) {
+  const ul = $('interests');
+  ul.querySelector('.empty')?.remove();
+  const li = document.createElement('li');
+  li.dataset.id = s.id;
+  li.innerHTML = `<span class="badge badge-${esc(s.level)}">${esc(s.level)}</span> ${esc(s.name)} <a href="#" class="x">×</a>`;
+  ul.appendChild(li);
+}
+
+async function send(answer) {
+  if (busy) return;
+  busy = true;
+  document.querySelectorAll('#turn button').forEach(b => b.disabled = true);
+  show($('status'), answer === null ? 'Picking a question…' : 'Filing your answer and picking the next question…', false);
+  try {
+    const res = await post('/api/interview/step', answer === null ? {} : {answer});
+    if (res.error) { show($('status'), res.error, true); return; }
+    if (answer !== null) {          // move the answered turn into history
+      const past = document.createElement('div');
+      past.className = 'iv-past';
+      past.dataset.turn = res.answered_turn;
+      past.innerHTML = `<div><b>Q:</b> ${esc($('question').textContent)}</div><div><b>A:</b> ${esc(answer || '(skipped)')}</div>` + chipsHtml(res.saved || []);
+      $('history').querySelector('.hint')?.remove();
+      $('history').prepend(past);
+    }
+    render(res);
+    show($('status'), '', false);
+  } catch (e) {
+    show($('status'), String(e), true);
+  } finally {
+    busy = false;
+    document.querySelectorAll('#turn button').forEach(b => b.disabled = false);
+  }
+}
+
+$('send').onclick = () => { const a = $('answer').value.trim(); if (a) send(a); };
+$('skip').onclick = () => send('');
+$('answer').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $('send').click(); }
+});
+
+// × on a filed item: undo it everywhere it is shown.
+document.addEventListener('click', async e => {
+  if (!e.target.classList.contains('x')) return;
+  e.preventDefault();
+  const li = e.target.closest('#interests li');
+  if (li) {
+    await post('/api/interview/interest/delete', {id: li.dataset.id});
+    li.remove();
+    return;
+  }
+  const chip = e.target.closest('.chip');
+  const holder = e.target.closest('[data-turn]');
+  if (!chip || !holder) return;
+  const index = +chip.dataset.index, turn = holder.dataset.turn;
+  const res = await post('/api/interview/undo', {turn_id: turn, index});
+  if (res.ok) {
+    document.querySelectorAll(`[data-turn="${turn}"] .chip[data-index="${index}"]`).forEach(c => {
+      c.classList.add('undone'); c.querySelector('.x')?.remove();
+      document.querySelector(`#interests li[data-id="${c.dataset.id}"]`)?.remove();
+    });
+  }
+});
+
+send(null);
+</script>
+{% endblock %}

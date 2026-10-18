@@ -180,6 +180,13 @@ def drop_proposed(entry_id: str) -> None:
     _save_proposed([e for e in load_proposed() if e["id"] != entry_id])
 
 
+def restore_proposed(entry: dict) -> None:
+    """Put a proposal back (undoing a confirm or drop); no-op if it is already there."""
+    proposed = load_proposed()
+    if not any(p["id"] == entry["id"] for p in proposed):
+        _save_proposed(proposed + [entry])
+
+
 def confirm_proposed(entry_id: str, edited: dict) -> dict:
     """Save his (possibly edited) version to the inventory and remove the proposal."""
     source = next((e.get("source", "proposal") for e in load_proposed() if e["id"] == entry_id), "proposal")

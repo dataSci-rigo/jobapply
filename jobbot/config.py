@@ -49,6 +49,7 @@ MATCHING_MODEL   = "claude-haiku-4-5-20251001"    # cheap normalization tasks
 GENERATION_EFFORT = "high"
 REVIEW_EFFORT     = "high"
 MAX_REVISIONS     = 2      # fact-check -> revise rounds before giving up and reporting
+INTERVIEW_EFFORT  = "medium"   # one intake-interview turn; he waits on each one
 
 # Input data files
 MASTER_RESUME_PATH = DATA_DIR / "master_resume.json"
@@ -57,6 +58,7 @@ STAR_PATH          = DATA_DIR / "star.json"
 CAPABILITIES_PATH  = DATA_DIR / "capabilities.json"   # optional: Profile-page intake
 JD_REQUIREMENTS_PATH = DATA_DIR / "jd_requirements.json"  # cache: requirements extracted per posting
 PROPOSED_CAPABILITIES_PATH = DATA_DIR / "capabilities_proposed.json"  # awaiting his confirmation
+INTERVIEW_PATH     = DATA_DIR / "interview.json"      # intake interview transcript + stated interests
 
 # PDF output directory
 PDF_DIR = DATA_DIR / "pdfs"
