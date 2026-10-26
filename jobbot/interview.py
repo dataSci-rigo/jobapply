@@ -228,28 +228,17 @@ def _apply(result: dict, data: dict) -> list[dict]:
     return saved
 
 
-def step(answer: str | None, jd_texts: list[str]) -> dict:
-    """
-    Record his answer to the open question (None = just start/resume; "" = skip),
-    file it, and ask the next question. Returns {saved, answered_turn, question, done}.
-    """
-    from generation.client import generate_json
+def _open_turn(data: dict) -> dict | None:
+    return data["turns"][-1] if data["turns"] and data["turns"][-1].get("answer") is None else None
 
+
+def _finish(answered: dict | None, result: dict) -> dict:
+    """File the reading of the answer to `answered` (if any) and append the next question."""
     data = _load()
-    open_turn = data["turns"][-1] if data["turns"] and data["turns"][-1].get("answer") is None else None
-    if open_turn and answer is None:
-        return {"saved": [], "answered_turn": None, "question": open_turn, "done": False}   # resume
-    if open_turn:
-        open_turn["answer"] = answer.strip() or "(skipped)"
-        _save(data)
-
-    prompt = _PROMPT.format(**_agenda(jd_texts))
-    result = generate_json(prompt, TURN_SCHEMA, effort=config.INTERVIEW_EFFORT, max_tokens=32000)
-
-    data = _load()                       # _agenda/upserts don't touch interview.json, but be exact
-    saved = _apply(result, data) if open_turn else []
-    if open_turn:
-        data["turns"][-1]["saved"] = saved
+    saved = _apply(result, data) if answered else []
+    if answered:
+        turn = next(t for t in data["turns"] if t["id"] == answered["id"])
+        turn["saved"] = saved
     question = None
     if not result["done"]:
         q = result["next_question"]
@@ -258,5 +247,65 @@ def step(answer: str | None, jd_texts: list[str]) -> dict:
                     "at": datetime.now().isoformat(timespec="seconds")}
         data["turns"].append(question)
     _save(data)
-    return {"saved": saved, "answered_turn": open_turn["id"] if open_turn else None,
+    return {"saved": saved, "answered_turn": answered["id"] if answered else None,
             "question": question, "done": result["done"]}
+
+
+def step(answer: str | None, jd_texts: list[str]) -> dict:
+    """
+    Record his answer to the open question (None = just start/resume; "" = skip),
+    file it, and ask the next question. Returns {saved, answered_turn, question, done}.
+    """
+    from generation.client import generate_json
+
+    data = _load()
+    open_turn = _open_turn(data)
+    if open_turn and answer is None:
+        return {"saved": [], "answered_turn": None, "question": open_turn, "done": False}   # resume
+    if open_turn:
+        open_turn["answer"] = answer.strip() or "(skipped)"
+        _save(data)
+
+    prompt = _PROMPT.format(**_agenda(jd_texts))
+    result = generate_json(prompt, TURN_SCHEMA, effort=config.INTERVIEW_EFFORT, max_tokens=32000)
+    return _finish(open_turn, result)
+
+
+_TURN_DEFAULTS = {"entries": [], "confirm_proposals": [], "drop_proposals": [], "answered_questions": [],
+                  "interests": [], "done": False}
+
+
+def file_turn(answer: str, result: dict) -> dict:
+    """
+    File a turn read by someone other than the model call in step() — Claude reading his
+    Telegram voice notes. `result` has TURN_SCHEMA's shape (missing lists default to empty).
+    The answer goes to the open question; with none open it is kept as an unprompted note.
+    """
+    result = {**_TURN_DEFAULTS, **result}
+    if not result["done"] and not (result.get("next_question") or {}).get("text"):
+        raise ValueError("next_question.text is required unless done is true")
+    result.setdefault("next_question", {"text": "", "why": "", "options": []})
+    result["next_question"] = {"why": "", "options": [], **result["next_question"]}
+    data = _load()
+    turn = _open_turn(data)
+    if turn is None:
+        turn = {"id": uuid.uuid4().hex[:10], "question": "(unprompted note)", "why": "", "options": [],
+                "answer": None, "at": datetime.now().isoformat(timespec="seconds")}
+        data["turns"].append(turn)
+    turn["answer"] = answer.strip() or "(skipped)"
+    _save(data)
+    return _finish(turn, result)
+
+
+def file_note(answer: str, result: dict) -> dict:
+    """
+    File something he added to an earlier answer without answering the open question:
+    it is kept as its own turn just before the open question, which stays open.
+    """
+    result = {**_TURN_DEFAULTS, **result, "done": True}
+    data = _load()
+    note = {"id": uuid.uuid4().hex[:10], "question": "(added to an earlier answer)", "why": "", "options": [],
+            "answer": answer.strip(), "at": datetime.now().isoformat(timespec="seconds")}
+    data["turns"].insert(len(data["turns"]) - (1 if _open_turn(data) else 0), note)
+    _save(data)
+    return _finish(note, result)

@@ -31,20 +31,25 @@ def get_client() -> anthropic.Anthropic:
 
 
 def _cached_source_blocks() -> list[dict]:
-    """The source blocks sent with prompt caching on every call (inventory only when it exists)."""
+    """
+    The source blocks sent on every call (inventory only when it exists).
+
+    The API allows 4 cache_control breakpoints per request and the system prompt uses
+    one. A breakpoint caches the whole prefix before it, so marking the last stable
+    block (STAR) and the inventory (which changes during intake) is enough: resume and
+    preferences stay cached, and an inventory edit only misses its own block.
+    """
     data = data_loader.load_all()
     blocks = [
         {
             "type": "text",
             "text": "MASTER RESUME (source of truth — do not fabricate beyond this):\n"
                     + json.dumps(data["resume"], indent=2),
-            "cache_control": {"type": "ephemeral"},
         },
         {
             "type": "text",
             "text": "PREFERENCES (standing answers):\n"
                     + json.dumps(data["prefs"], indent=2),
-            "cache_control": {"type": "ephemeral"},
         },
         {
             "type": "text",

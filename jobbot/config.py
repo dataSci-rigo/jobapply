@@ -60,6 +60,16 @@ JD_REQUIREMENTS_PATH = DATA_DIR / "jd_requirements.json"  # cache: requirements 
 PROPOSED_CAPABILITIES_PATH = DATA_DIR / "capabilities_proposed.json"  # awaiting his confirmation
 INTERVIEW_PATH     = DATA_DIR / "interview.json"      # intake interview transcript + stated interests
 
+# Telegram voice interview (jobbot_telegram.py): the bot only carries messages; Claude
+# reads each answer from the inbox and replies with the next question.
+TELEGRAM_BOT_TOKEN = os.environ.get("Telegram_bot_apply2jobs", "")
+TELEGRAM_CHAT_ID   = os.environ.get("TELEGRAM_ID", "")          # the only chat it answers
+TELEGRAM_INBOX_PATH = DATA_DIR / "telegram_inbox.jsonl"   # his messages, transcribed, append-only
+TELEGRAM_STATE_PATH = DATA_DIR / "telegram_state.json"    # getUpdates offset + read cursor
+VOICE_DIR           = DATA_DIR / "voice"                  # original voice notes, for re-transcribing
+OPENROUTER_KEY      = os.environ.get("OPEN_ROUTER", "")
+TRANSCRIBE_MODEL    = os.environ.get("JOBBOT_TRANSCRIBE_MODEL", "google/gemini-2.5-flash")
+
 # PDF output directory
 PDF_DIR = DATA_DIR / "pdfs"
 PDF_DIR.mkdir(parents=True, exist_ok=True)
